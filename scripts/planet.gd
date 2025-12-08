@@ -20,7 +20,7 @@ var terrain: Node3D
 var height_image: Image 
 var last_cam_pos: Vector3 = Vector3.ZERO 
 
-# --- BASIC PLANET SHADER (Texture + Specular + Seam Fix) ---
+# --- PLANET SHADER (UV SEAM FIXED) ---
 const PLANET_SHADER = """
 shader_type spatial;
 render_mode depth_draw_always; 
@@ -37,24 +37,29 @@ void vertex() {
 
 void fragment() {
     vec3 n = normalize(v_local_pos);
+    float PI = 3.14159265359;
     
     // Equirectangular UV Mapping
-    float u = atan(n.x, n.z) / (2.0 * 3.14159) + 0.5;
-    float v = asin(n.y) / 3.14159 + 0.5;
-    u = u + 0.5; 
-    v = 1.0 - v; 
+    // Matches the CPU logic: atan2(x, -z)
+    float u = 0.5 + atan(n.x, -n.z) / (2.0 * PI);
+    float v = 0.5 - asin(n.y) / PI;
     vec2 uv = vec2(u, v);
     
-    // Seam Fix (Prevents line on the back of the planet)
+    // --- SEAM FIX ---
+    // Manually calculate derivatives
     vec2 ddx = dFdx(uv); 
     vec2 ddy = dFdy(uv);
+    
+    // Detect the wrap-around jump (e.g. 0.99 -> 0.01)
+    // If the change is > 0.5, we assume it wrapped and invert the derivative
     if (abs(ddx.x) > 0.5) ddx.x = -sign(ddx.x) * (1.0 - abs(ddx.x));
     if (abs(ddy.x) > 0.5) ddy.x = -sign(ddy.x) * (1.0 - abs(ddy.x));
     
+    // Sample texture using corrected gradients to prevent the blurred line
     ALBEDO = textureGrad(color_map, uv, ddx, ddy).rgb;
     
     float spec = textureGrad(specular_map, uv, ddx, ddy).r;
-    ROUGHNESS = mix(roughness_base, 0.1, spec); // Map white = shiny
+    ROUGHNESS = mix(roughness_base, 0.1, spec); 
     SPECULAR = spec * 0.5;
 }
 """
@@ -197,11 +202,9 @@ func _build_patch_mesh(normal, axis_a, axis_b, x0, y0, size, res) -> ArrayMesh:
 			var final_radius = float(planet_radius)
 			if height_image and iw > 0:
 				var n = sphere_p
-				# Same UV mapping as shader
-				var u = atan2(n.x, n.z) / (2.0 * PI) + 0.5
-				var v = asin(n.y) / PI + 0.5
-				u = u + 0.5
-				v = 1.0 - v
+				# Use same mapping logic as shader: atan2(x, -z)
+				var u = 0.5 + atan2(n.x, -n.z) / (2.0 * PI)
+				var v = 0.5 - asin(n.y) / PI
 				
 				u = fmod(u, 1.0); if u < 0: u += 1.0
 				
@@ -212,7 +215,7 @@ func _build_patch_mesh(normal, axis_a, axis_b, x0, y0, size, res) -> ArrayMesh:
 				final_radius += float(h_val) * float(height_intensity)
 
 			verts.append(sphere_p * final_radius)
-			norms.append(sphere_p) # Basic normal pointing up
+			norms.append(sphere_p) 
 
 	for y in range(res - 1):
 		for x in range(res - 1):
@@ -224,7 +227,7 @@ func _build_patch_mesh(normal, axis_a, axis_b, x0, y0, size, res) -> ArrayMesh:
 			indices.append(i0); indices.append(i2); indices.append(i1)
 			indices.append(i1); indices.append(i2); indices.append(i3)
 
-	# --- SKIRTS (Fixes stitching holes) ---
+	# --- SKIRTS ---
 	var skirt_depth = float(height_intensity) + (planet_radius * 0.05)
 	var edge_indices = []
 	
@@ -236,7 +239,6 @@ func _build_patch_mesh(normal, axis_a, axis_b, x0, y0, size, res) -> ArrayMesh:
 	var start_skirt = verts.size()
 	for i in edge_indices:
 		var p = verts[i]
-		# Pull skirt down
 		verts.append(p - (p.normalized() * skirt_depth))
 		norms.append(norms[i])
 	
@@ -268,11 +270,9 @@ func _update_lod():
 
 func _process_lod_recursive(patch: Patch, local_cam_pos: Vector3):
 	var dist = local_cam_pos.distance_to(patch.center_point)
-	
-	# Horizon Culling (Don't render back side)
+	# Horizon Culling
 	var patch_dir = patch.center_point.normalized()
 	var cam_dir = local_cam_pos.normalized()
-	
 	if patch_dir.dot(cam_dir) < -0.2 and dist > planet_radius * 0.5:
 		if !patch.children.is_empty(): _collapse(patch)
 		return
