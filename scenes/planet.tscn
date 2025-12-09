@@ -1,33 +1,15 @@
-[gd_scene load_steps=10 format=3 uid="uid://hgdfgc5qam2i"]
+[gd_scene load_steps=5 format=3 uid="uid://hgdfgc5qam2i"]
 
-[ext_resource type="Script" uid="uid://3jqd4tfac6xp" path="res://scripts/camera_movement.gd" id="1_cktii"]
 [ext_resource type="Script" uid="uid://b6jnltpt4muy6" path="res://scripts/planet.gd" id="1_h8ms6"]
-[ext_resource type="Texture2D" uid="uid://d10j4kvc87vd6" path="res://assets/earth_color_21K.png" id="2_3s4jt"]
-[ext_resource type="Texture2D" uid="uid://0r2abyhnojb4" path="res://assets/specular_map 8k.png" id="3_1wmcx"]
-[ext_resource type="Texture2D" uid="uid://b06rleh07s46s" path="res://assets/HDR_silver_and_gold_nebulae.hdr" id="3_ggt7d"]
-[ext_resource type="Texture2D" uid="uid://beuthr618r74b" path="res://assets/topography_21K.png" id="4_3s4jt"]
-
-[sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_0k1rn"]
-panorama = ExtResource("3_ggt7d")
-
-[sub_resource type="Sky" id="Sky_48b8c"]
-sky_material = SubResource("PanoramaSkyMaterial_0k1rn")
-
-[sub_resource type="Environment" id="Environment_3s4jt"]
-background_mode = 2
-sky = SubResource("Sky_48b8c")
+[ext_resource type="Texture2D" uid="uid://d10j4kvc87vd6" path="res://assets/earth_color_21K.png" id="2_0k1rn"]
+[ext_resource type="Texture2D" uid="uid://0r2abyhnojb4" path="res://assets/specular_map 8k.png" id="2_h8ms6"]
+[ext_resource type="Texture2D" uid="uid://beuthr618r74b" path="res://assets/topography_21K.png" id="4_48b8c"]
 
 [node name="Planet" type="Node3D" unique_id=1969590477]
 script = ExtResource("1_h8ms6")
-color_map = ExtResource("2_3s4jt")
-specular_map = ExtResource("3_1wmcx")
-height_map = ExtResource("4_3s4jt")
+live_update = true
+color_map = ExtResource("2_0k1rn")
+specular_map = ExtResource("2_h8ms6")
+height_map = ExtResource("4_48b8c")
 
-[node name="Terrain" type="Node3D" parent="." unique_id=809445832]
-
-[node name="Camera3D" type="Camera3D" parent="." unique_id=188608952]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 790.8501)
-script = ExtResource("1_cktii")
-
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1009601211]
-environment = SubResource("Environment_3s4jt")
+[node name="Terrain" type="Node3D" parent="." unique_id=1632565572]
