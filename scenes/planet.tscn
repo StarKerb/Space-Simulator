@@ -1,12 +1,10 @@
-[gd_scene load_steps=7 format=3 uid="uid://hgdfgc5qam2i"]
+[gd_scene load_steps=6 format=3 uid="uid://hgdfgc5qam2i"]
 
 [ext_resource type="Script" uid="uid://b6jnltpt4muy6" path="res://scripts/planet.gd" id="1_h8ms6"]
 [ext_resource type="Texture2D" uid="uid://d10j4kvc87vd6" path="res://assets/earth_color_21K.png" id="2_0k1rn"]
 [ext_resource type="Texture2D" uid="uid://0r2abyhnojb4" path="res://assets/specular_map 8k.png" id="2_h8ms6"]
 [ext_resource type="Texture2D" uid="uid://bx5gcgn2sjbop" path="res://assets/topography_21K.png" id="4_48b8c"]
 [ext_resource type="Script" uid="uid://3jqd4tfac6xp" path="res://scripts/camera_movement.gd" id="5_48b8c"]
-
-[sub_resource type="Environment" id="Environment_48b8c"]
 
 [node name="Planet" type="Node3D" unique_id=1969590477]
 script = ExtResource("1_h8ms6")
@@ -26,7 +24,6 @@ move_speed = 100.0
 fast_multiplier = 10.0
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=402786032]
-environment = SubResource("Environment_48b8c")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=2123428256]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 550, 879)
