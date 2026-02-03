@@ -3,173 +3,183 @@ extends Node3D
 
 @export_group("Planet Settings")
 @export var radius: float = 600.0 : set = _set_radius
-@export var resolution: int = 32 
-@export var spawn_planet: bool = false : set = _spawn_trigger
+@export var resolution: int = 32 : set = _set_res
+@export var max_lod: int = 4 : set = _set_lod
+@export var lod_threshold: float = 2.0 
 
 @export_group("Textures")
-@export var global_albedo: Texture2D : set = _set_albedo
-@export_dir var tiles_dir: String = "res://assets/earth tiles/21K"
-@export var tile_prefix: String = "16k" 
+@export_dir var color_dir: String = "res://assets/earth/color"
+@export_dir var height_dir: String = "res://assets/earth/height"
+@export var out_format: String = ".png"
 
-@export_group("System")
-@export var live_track: bool = true 
-@export var load_dist: float = 2000.0 # Distance from planet center to trigger load
+@export_group("Terrain Settings")
+@export var height_scale: float = 15.0 : set = _set_hscale
+@export var spawn_planet: bool = false : set = _spawn_trigger # FIXED: Declared variable
 
 var terrain_node: Node3D
-var patches: Array = []
-var _texture_cache: Dictionary = {}
-var _loading_set: Dictionary = {}
-var _check_timer: float = 0.0
+var camera: Camera3D
+var _face_textures: Dictionary = {}
+var _height_textures: Dictionary = {}
 
-const PLANET_SHADER = """
+const LOD_SHADER = """
 shader_type spatial;
-uniform sampler2D global_map : source_color, filter_linear_mipmap;
-uniform sampler2D tile_map : source_color, filter_linear_mipmap;
-uniform vec4 tile_bounds = vec4(0.0, 0.25, 0.0, 0.5);
-uniform float tile_alpha : hint_range(0.0, 1.0) = 0.0;
+render_mode cull_back, depth_draw_always;
 
-varying vec3 v_normal;
+uniform sampler2D t1; uniform sampler2D t2; 
+uniform sampler2D t3; uniform sampler2D t4;
+uniform sampler2D h1; uniform sampler2D h2;
+uniform sampler2D h3; uniform sampler2D h4;
 
-void vertex() { v_normal = normalize(VERTEX); }
+uniform float h_scale = 10.0;
+varying vec2 v_uv;
+
+void vertex() {
+	v_uv = UV;
+	float h = 0.0;
+	// Monochrome sampling: Black is low, White is high
+	if (v_uv.y < 0.5) {
+		if (v_uv.x < 0.5) h = texture(h1, v_uv * 2.0).r;
+		else h = texture(h2, vec2(v_uv.x - 0.5, v_uv.y) * 2.0).r;
+	} else {
+		if (v_uv.x < 0.5) h = texture(h3, vec2(v_uv.x, v_uv.y - 0.5) * 2.0).r;
+		else h = texture(h4, (v_uv - 0.5) * 2.0).r;
+	}
+	VERTEX += NORMAL * (h * h_scale);
+}
 
 void fragment() {
-    vec3 n = normalize(v_normal);
-    float u = (atan(n.x, n.z) + PI) / (2.0 * PI);
-    float v = asin(n.y) / PI + 0.5;
-    vec2 global_uv = vec2(u, 1.0 - v);
-    
-    vec3 g_color = texture(global_map, global_uv).rgb;
-    vec3 final_color = g_color;
-
-    if (tile_alpha > 0.01 && 
-        global_uv.x >= tile_bounds.x && global_uv.x <= tile_bounds.y &&
-        global_uv.y >= tile_bounds.z && global_uv.y <= tile_bounds.w) {
-        
-        vec2 tile_uv = (global_uv - tile_bounds.xz) / (tile_bounds.yw - tile_bounds.xz);
-        vec3 t_color = texture(tile_map, tile_uv).rgb;
-        final_color = mix(g_color, t_color, tile_alpha);
-    }
-    
-    ALBEDO = final_color;
-    ROUGHNESS = 0.8;
+	vec3 color;
+	if (v_uv.y < 0.5) {
+		if (v_uv.x < 0.5) color = texture(t1, v_uv * 2.0).rgb;
+		else color = texture(t2, vec2(v_uv.x - 0.5, v_uv.y) * 2.0).rgb;
+	} else {
+		if (v_uv.x < 0.5) color = texture(t3, vec2(v_uv.x, v_uv.y - 0.5) * 2.0).rgb;
+		else color = texture(t4, (v_uv - 0.5) * 2.0).rgb;
+	}
+	ALBEDO = color;
+	ROUGHNESS = 0.8;
 }
 """
 
 func _ready():
-	_check_timer = 0.0
-	_init_planet()
+	if not Engine.is_editor_hint():
+		_init_planet()
 
-func _process(delta):
-	if _check_timer == null: _check_timer = 0.0
-	_check_loading_status()
-	
-	if Engine.is_editor_hint() and not live_track: return
-	
-	_check_timer += delta
-	if _check_timer > 0.1: 
-		_check_timer = 0.0
-		_update_logic(delta)
-
-# THE OLD TRACKING SYSTEM REBORN
-func _find_camera() -> Camera3D:
-	if Engine.is_editor_hint():
-		var vp = EditorInterface.get_editor_viewport_3d(0)
-		if vp: return vp.get_camera_3d()
-	return get_viewport().get_camera_3d()
+func _process(_delta):
+	if Engine.is_editor_hint(): return
+	if not camera: camera = get_viewport().get_camera_3d()
+	if camera and terrain_node:
+		for face in terrain_node.get_children():
+			face.update_lod(camera.global_position, lod_threshold)
 
 func _init_planet():
-	terrain_node = get_node_or_null("Terrain")
-	if not terrain_node:
-		terrain_node = Node3D.new(); terrain_node.name = "Terrain"; add_child(terrain_node)
-		if Engine.is_editor_hint(): terrain_node.owner = get_tree().edited_scene_root
-	else:
-		for c in terrain_node.get_children(): c.queue_free()
+	_preload_textures()
+	if has_node("Terrain"): get_node("Terrain").free()
 	
-	patches.clear()
-	var dirs = [Vector3.RIGHT, Vector3.LEFT, Vector3.UP, Vector3.DOWN, Vector3.FORWARD, Vector3.BACK]
-	for i in range(6): _create_patch(dirs[i], i)
+	terrain_node = Node3D.new()
+	terrain_node.name = "Terrain"
+	add_child(terrain_node)
+	if Engine.is_editor_hint(): terrain_node.owner = get_tree().edited_scene_root
 
-func _create_patch(n: Vector3, i: int):
-	var axis_a = Vector3(n.y, n.z, n.x); var axis_b = n.cross(axis_a)
-	var st = SurfaceTool.new(); st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var s = 1.0/float(resolution)
-	for y in range(resolution):
-		for x in range(resolution):
-			var p1=(n+axis_a*((x*s-0.5)*2.0)+axis_b*((y*s-0.5)*2.0)).normalized()*radius
-			var p2=(n+axis_a*(((x+1)*s-0.5)*2.0)+axis_b*((y*s-0.5)*2.0)).normalized()*radius
-			var p3=(n+axis_a*((x*s-0.5)*2.0)+axis_b*(((y+1)*s-0.5)*2.0)).normalized()*radius
-			var p4=(n+axis_a*(((x+1)*s-0.5)*2.0)+axis_b*(((y+1)*s-0.5)*2.0)).normalized()*radius
-			st.add_vertex(p3); st.add_vertex(p2); st.add_vertex(p1)
-			st.add_vertex(p3); st.add_vertex(p4); st.add_vertex(p2)
-	st.generate_normals()
-	var mi = MeshInstance3D.new(); mi.mesh = st.commit(); terrain_node.add_child(mi)
-	if Engine.is_editor_hint(): mi.owner = get_tree().edited_scene_root
-	var mat = ShaderMaterial.new(); mat.shader = Shader.new(); mat.shader.code = PLANET_SHADER
-	if global_albedo: mat.set_shader_parameter("global_map", global_albedo)
-	mi.set_surface_override_material(0, mat)
+	var faces = [
+		{"id": "A", "n": Vector3.RIGHT,   "a": Vector3.BACK,    "b": Vector3.UP},
+		{"id": "B", "n": Vector3.LEFT,    "a": Vector3.FORWARD, "b": Vector3.UP},
+		{"id": "C", "n": Vector3.UP,      "a": Vector3.RIGHT,   "b": Vector3.BACK},
+		{"id": "D", "n": Vector3.DOWN,    "a": Vector3.RIGHT,   "b": Vector3.FORWARD},
+		{"id": "E", "n": Vector3.FORWARD, "a": Vector3.RIGHT,   "b": Vector3.UP},
+		{"id": "F", "n": Vector3.BACK,    "a": Vector3.LEFT,    "b": Vector3.UP}
+	]
 	
-	patches.append({
-		"node": mi, 
-		"center": n * radius, 
-		"active_tile": "", 
-		"alpha": 0.0
-	})
+	for f in faces:
+		var face_root = PlanetQuad.new(f.n, f.a, f.b, 0, Vector2.ZERO, 1.0, self, f.id)
+		terrain_node.add_child(face_root)
 
-func _update_logic(delta):
-	var cam = _find_camera()
-	if not cam: return
-	
-	var cam_pos = to_local(cam.global_position)
-	
-	for p in patches:
-		if not p.has("alpha"): continue
+func _preload_textures():
+	_face_textures.clear()
+	_height_textures.clear()
+	for f in ["A", "B", "C", "D", "E", "F"]:
+		var c_set = []; var h_set = []
+		for i in range(1, 5):
+			var c_p = color_dir.path_join(f + str(i) + out_format)
+			var h_p = height_dir.path_join(f + str(i) + out_format)
+			if FileAccess.file_exists(c_p): c_set.append(load(c_p))
+			if FileAccess.file_exists(h_p): h_set.append(load(h_p))
+		_face_textures[f] = c_set
+		_height_textures[f] = h_set
+
+class PlanetQuad extends Node3D:
+	var normal: Vector3; var axis_a: Vector3; var axis_b: Vector3
+	var level: int; var offset: Vector2; var size: float
+	var planet: Node3D; var face_id: String
+	var mesh_instance: MeshInstance3D
+	var children = []
+
+	func _init(_n, _a, _b, _l, _o, _s, _p, _f):
+		normal = _n; axis_a = _a; axis_b = _b
+		level = _l; offset = _o; size = _s
+		planet = _p; face_id = _f
+		_create_mesh()
+
+	func _create_mesh():
+		var st = SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var res = planet.resolution
 		
-		# Distance logic from your working LOD system
-		var dist = p["center"].distance_to(cam_pos)
-		var is_near = dist < load_dist
+		var rot_transform = Transform3D.IDENTITY
+		if face_id in ["A", "B", "E", "F"]:
+			rot_transform = rot_transform.rotated(Vector3(0, 0, 1), deg_to_rad(-180.0))
+			rot_transform = rot_transform.rotated(Vector3(0, 1, 0), deg_to_rad(180.0))
+
+		for y in range(res + 1):
+			for x in range(res + 1):
+				var p = Vector2(x, y) / float(res)
+				var uv = offset + p * size
+				var point = (normal + axis_a * (uv.x - 0.5) * 2.0 + axis_b * (uv.y - 0.5) * 2.0).normalized()
+				var final_point = rot_transform * point
+				st.set_normal((rot_transform.basis * point).normalized())
+				st.set_uv(uv)
+				st.add_vertex(final_point * planet.radius)
+
+		for y in range(res):
+			for x in range(res):
+				var i = x + y * (res + 1)
+				st.add_index(i); st.add_index(i+1); st.add_index(i+res+1)
+				st.add_index(i+1); st.add_index(i+res+2); st.add_index(i+res+1)
 		
-		if is_near:
-			p["alpha"] = min(p["alpha"] + delta * 2.0, 1.0)
-			var n = p["center"].normalized()
-			var u = (atan2(n.x, n.z) + PI) / (2.0 * PI)
-			var v = asin(n.y) / PI + 0.5
-			var guv = Vector2(u, 1.0 - v)
-			var col = clamp(int(guv.x * 4.0), 0, 3)
-			var row = clamp(int(guv.y * 2.0), 0, 1)
-			var t_name = ["A","B","C","D"][col] + str(row + 1)
-			
-			if p["active_tile"] != t_name: _try_load_tile(p, t_name, col, row)
-		else:
-			p["alpha"] = max(p["alpha"] - delta * 2.0, 0.0)
-			if p["alpha"] <= 0.0: p["active_tile"] = ""
+		mesh_instance = MeshInstance3D.new()
+		mesh_instance.mesh = st.commit()
+		add_child(mesh_instance)
+		
+		var mat = ShaderMaterial.new(); mat.shader = Shader.new(); mat.shader.code = planet.LOD_SHADER
+		mat.set_shader_parameter("h_scale", planet.height_scale)
+		var c_tiles = planet._face_textures[face_id]
+		var h_tiles = planet._height_textures[face_id]
+		for i in range(c_tiles.size()): mat.set_shader_parameter("t"+str(i+1), c_tiles[i])
+		for i in range(h_tiles.size()): mat.set_shader_parameter("h"+str(i+1), h_tiles[i])
+		mesh_instance.set_surface_override_material(0, mat)
 
-		if is_instance_valid(p["node"]):
-			var mat = p["node"].get_surface_override_material(0)
-			if mat: mat.set_shader_parameter("tile_alpha", p["alpha"])
+	func update_lod(cam_pos: Vector3, threshold: float):
+		var dist = global_position.distance_to(cam_pos)
+		var should_split = dist < (planet.radius / pow(1.6, level)) * threshold and level < planet.max_lod
+		if should_split and children.is_empty(): _split()
+		elif not should_split and not children.is_empty(): _merge()
+		for child in children: child.update_lod(cam_pos, threshold)
 
-func _try_load_tile(p: Dictionary, name: String, c: int, r: int):
-	if _texture_cache.has(name):
-		var mat = p["node"].get_surface_override_material(0)
-		if mat:
-			mat.set_shader_parameter("tile_map", _texture_cache[name])
-			mat.set_shader_parameter("tile_bounds", Vector4(c*0.25, (c+1)*0.25, r*0.5, (r+1)*0.5))
-		p["active_tile"] = name
-	else:
-		if not _loading_set.has(name):
-			var path = tiles_dir.path_join(tile_prefix + name + ".jpg")
-			if FileAccess.file_exists(path):
-				_loading_set[name] = path
-				ResourceLoader.load_threaded_request(path)
+	func _split():
+		mesh_instance.visible = false
+		var s = size * 0.5
+		children.append(PlanetQuad.new(normal, axis_a, axis_b, level + 1, offset, s, planet, face_id))
+		children.append(PlanetQuad.new(normal, axis_a, axis_b, level + 1, offset + Vector2(s, 0), s, planet, face_id))
+		children.append(PlanetQuad.new(normal, axis_a, axis_b, level + 1, offset + Vector2(0, s), s, planet, face_id))
+		children.append(PlanetQuad.new(normal, axis_a, axis_b, level + 1, offset + Vector2(s, s), s, planet, face_id))
+		for c in children: add_child(c)
 
-func _check_loading_status():
-	var finished = []
-	for name in _loading_set:
-		var status = ResourceLoader.load_threaded_get_status(_loading_set[name])
-		if status == ResourceLoader.THREAD_LOAD_LOADED:
-			_texture_cache[name] = ResourceLoader.load_threaded_get(_loading_set[name])
-			finished.append(name)
-	for f in finished: _loading_set.erase(f)
+	func _merge():
+		for c in children: c.queue_free()
+		children.clear(); mesh_instance.visible = true
 
-func _set_radius(v): radius = v; if terrain_node: _init_planet()
-func _set_albedo(v): global_albedo = v; if terrain_node: _init_planet()
+func _set_radius(v): radius = v; if Engine.is_editor_hint(): _init_planet()
+func _set_res(v): resolution = v; if Engine.is_editor_hint(): _init_planet()
+func _set_lod(v): max_lod = v; if Engine.is_editor_hint(): _init_planet()
+func _set_hscale(v): height_scale = v; if Engine.is_editor_hint(): _init_planet()
 func _spawn_trigger(v): if v: _init_planet(); spawn_planet = false
