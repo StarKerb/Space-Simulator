@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://dwl3yl53bkq5s"]
+
+[ext_resource type="PackedScene" uid="uid://hgdfgc5qam2i" path="res://scenes/planet.tscn" id="1_rysn1"]
+[ext_resource type="Script" uid="uid://3jqd4tfac6xp" path="res://scripts/camera_movement.gd" id="2_c6rj5"]
+
+[node name="Node3D" type="Node3D" unique_id=1989551412]
+
+[node name="Planet" parent="." unique_id=1969590477 instance=ExtResource("1_rysn1")]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0, 0, 0)
+resolution = 128
+fade_duration = null
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=63494421]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1917.1974, 0, -385.86322)
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=195763807]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 65.27136, 0, 1280.7517)
+script = ExtResource("2_c6rj5")
+move_speed = 60.0

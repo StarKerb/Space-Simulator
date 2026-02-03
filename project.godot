@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="space simulator"
-run/main_scene="uid://hgdfgc5qam2i"
+run/main_scene="uid://dwl3yl53bkq5s"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 
