@@ -3,12 +3,9 @@ extends Node3D
 
 @export_group("Planet Settings")
 @export var radius: float = 600.0 : set = _set_radius
-@export var resolution: int = 64 
-@export var max_lod: int = 8 : set = _set_lod 
-@export var lod_threshold: float = 2.5 
-
-@export_group("Debug")
-@export var wireframe_mode: bool = false : set = _set_wireframe
+@export var resolution: int = 32 
+@export var max_lod: int = 6 : set = _set_lod
+@export var lod_threshold: float = 3.0
 
 @export_group("Textures")
 @export_dir var color_dir: String = "res://assets/earth/color"
@@ -16,17 +13,17 @@ extends Node3D
 @export var out_format: String = ".png"
 
 @export_group("Terrain Settings")
-@export var height_scale: float = 5.0 : set = _set_hscale 
-@export var spawn_planet: bool = false : set = _spawn_trigger 
-@export var fade_duration: float = 0.5 
+@export var height_scale: float = 5.0 : set = _set_hscale
+@export var build_planet: bool = false : set = _trigger_build
 
-var terrain_node: Node3D
 var camera: Camera3D
+var terrain_mesh_node: MeshInstance3D
 var _face_textures: Dictionary = {}
 var _height_textures: Dictionary = {}
-var build_queue: Array = []
+var root_quads: Array = []
+var vertex_count_tracker: int = 0 # THE FIX fr
 
-const LOD_SHADER = """
+const MONOLITH_SHADER = """
 shader_type spatial;
 render_mode unshaded, cull_back, depth_draw_always;
 
@@ -40,13 +37,11 @@ uniform sampler2D h3 : filter_linear_mipmap;
 uniform sampler2D h4 : filter_linear_mipmap;
 
 uniform float h_scale = 5.0;
-uniform bool wireframe = false;
-uniform float fade : hint_range(0.0, 1.0) = 1.0;
 varying vec2 v_uv;
 
 void vertex() {
 	v_uv = UV;
-	float m = 0.0001;
+	float m = 0.0001; 
 	float h = 0.0;
 	if (v_uv.y < 0.5) {
 		if (v_uv.x < 0.5) h = texture(h1, clamp(v_uv * 2.0, m, 1.0 - m)).r;
@@ -59,11 +54,6 @@ void vertex() {
 }
 
 void fragment() {
-	if (fade < 1.0) {
-		float d_t[16] = {0.0625, 0.5625, 0.1875, 0.6875, 0.8125, 0.3125, 0.9375, 0.4375, 0.25, 0.75, 0.125, 0.625, 1.0, 0.5, 0.875, 0.375};
-		uvec2 uv = uvec2(FRAGCOORD.xy) % 4u;
-		if (fade < d_t[uv.x + uv.y * 4u]) discard;
-	}
 	vec3 tex_color;
 	float m = 0.0001; 
 	if (v_uv.y < 0.5) {
@@ -74,31 +64,29 @@ void fragment() {
 		else tex_color = texture(t4, clamp((v_uv - 0.5) * 2.0, m, 1.0 - m)).rgb;
 	}
 	ALBEDO = tex_color;
-	if (wireframe) {
-		vec2 grid = abs(fract(v_uv * 16.0 - 0.5) - 0.5) / fwidth(v_uv * 16.0);
-		ALBEDO = mix(ALBEDO, vec3(0.0, 1.0, 0.0), 1.0 - smoothstep(0.0, 0.1, min(grid.x, grid.y)));
-	}
 }
 """
 
-func _ready(): _init_planet()
+func _ready():
+	_init_monolith_node()
 
 func _process(_delta):
-	if not build_queue.is_empty():
-		var q = build_queue.pop_front()
-		if is_instance_valid(q) and q.state != 2: q._generate_mesh_final()
-	if Engine.is_editor_hint(): return
+	if Engine.is_editor_hint() and not build_planet: return
 	if not camera: camera = get_viewport().get_camera_3d()
-	if camera and terrain_node:
-		for face in terrain_node.get_children(): face.update_lod(camera.global_position, _delta)
+	if camera and terrain_mesh_node:
+		_update_monolith_lod(camera.global_position)
 
-func _init_planet():
+func _init_monolith_node():
 	_preload_textures()
 	for child in get_children():
-		if child.name.begins_with("Terrain"): child.free()
-	build_queue.clear()
-	terrain_node = Node3D.new(); terrain_node.name = "Terrain"; add_child(terrain_node)
-	var faces = [
+		if child.name == "MonolithTerrain": child.free()
+	
+	terrain_mesh_node = MeshInstance3D.new()
+	terrain_mesh_node.name = "MonolithTerrain"
+	add_child(terrain_mesh_node)
+	
+	root_quads.clear()
+	var configs = [
 		{"id": "A", "n": Vector3.RIGHT, "a": Vector3.BACK, "b": Vector3.UP},
 		{"id": "B", "n": Vector3.LEFT, "a": Vector3.FORWARD, "b": Vector3.UP},
 		{"id": "C", "n": Vector3.UP, "a": Vector3.RIGHT, "b": Vector3.BACK},
@@ -106,127 +94,106 @@ func _init_planet():
 		{"id": "E", "n": Vector3.FORWARD, "a": Vector3.RIGHT, "b": Vector3.UP},
 		{"id": "F", "n": Vector3.BACK, "a": Vector3.LEFT, "b": Vector3.UP}
 	]
-	for f in faces:
-		var face_root = PlanetQuad.new(f.n, f.a, f.b, 0, Vector2.ZERO, 1.0, self, f.id)
-		terrain_node.add_child(face_root)
+	for c in configs:
+		root_quads.append(QuadData.new(c.n, c.a, c.b, 0, Vector2.ZERO, 1.0, c.id))
+	_stitch_monolith()
+
+func _update_monolith_lod(cam_pos: Vector3):
+	var changed = false
+	for q in root_quads:
+		if q.update_lod(cam_pos, radius, max_lod, lod_threshold, global_transform):
+			changed = true
+	if changed:
+		_stitch_monolith()
+
+func _stitch_monolith():
+	var st = SurfaceTool.new()
+	var am = ArrayMesh.new()
+	var face_groups = {"A":[], "B":[], "C":[], "D":[], "E":[], "F":[]}
+	_collect_active(root_quads, face_groups)
+	
+	for face_id in face_groups:
+		if face_groups[face_id].is_empty(): continue
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		vertex_count_tracker = 0 # Reset for each face surface
+		for q in face_groups[face_id]:
+			_add_geometry(st, q)
+		st.commit(am)
+		
+		var mat = ShaderMaterial.new()
+		mat.shader = Shader.new(); mat.shader.code = MONOLITH_SHADER
+		mat.set_shader_parameter("h_scale", height_scale)
+		for i in range(_face_textures[face_id].size()):
+			mat.set_shader_parameter("t"+str(i+1), _face_textures[face_id][i])
+			mat.set_shader_parameter("h"+str(i+1), _height_textures[face_id][i])
+		am.surface_set_material(am.get_surface_count() - 1, mat)
+	
+	terrain_mesh_node.mesh = am
+	terrain_mesh_node.custom_aabb = AABB(Vector3(-radius*2,-radius*2,-radius*2), Vector3(radius*4,radius*4,radius*4))
+
+func _add_geometry(st: SurfaceTool, q: QuadData):
+	var res = resolution
+	var v_offset = vertex_count_tracker # FIXED: Manually tracking
+	for y in range(res + 1):
+		for x in range(res + 1):
+			var uv = q.offset + (Vector2(x, y) / float(res)) * q.size
+			var p = (q.normal + q.axis_a * (uv.x - 0.5) * 2.0 + q.axis_b * (uv.y - 0.5) * 2.0).normalized()
+			if q.face_id in ["A", "B", "E", "F"]:
+				p = p.rotated(Vector3(0, 0, 1), -PI).rotated(Vector3(0, 1, 0), PI)
+			st.set_normal(p); st.set_uv(uv); st.add_vertex(p * radius)
+			vertex_count_tracker += 1
+	for y in range(res):
+		for x in range(res):
+			var i = v_offset + x + y * (res + 1)
+			st.add_index(i); st.add_index(i+1); st.add_index(i+res+1)
+			st.add_index(i+1); st.add_index(i+res+2); st.add_index(i+res+1)
+
+func _collect_active(quads: Array, groups: Dictionary):
+	for q in quads:
+		if q.children.is_empty(): groups[q.face_id].append(q)
+		else: _collect_active(q.children, groups)
 
 func _preload_textures():
 	_face_textures.clear(); _height_textures.clear()
 	for f in ["A", "B", "C", "D", "E", "F"]:
 		var c_set = []; var h_set = []
 		for i in range(1, 5):
-			var c_p = color_dir.path_join(f + str(i) + out_format); var h_p = height_dir.path_join(f + str(i) + out_format)
+			var c_p = color_dir.path_join(f + str(i) + out_format)
+			var h_p = height_dir.path_join(f + str(i) + out_format)
 			if FileAccess.file_exists(c_p): c_set.append(load(c_p))
 			if FileAccess.file_exists(h_p): h_set.append(load(h_p))
 		_face_textures[f] = c_set; _height_textures[f] = h_set
 
-class PlanetQuad extends Node3D:
+class QuadData:
 	var normal: Vector3; var axis_a: Vector3; var axis_b: Vector3
 	var level: int; var offset: Vector2; var size: float
-	var planet: Node3D; var face_id: String
-	var mesh_instance: MeshInstance3D
-	var children = []
-	var base_center: Vector3 
-	var current_fade: float = 0.0
-	var state: int = 0 # 0: Fade In, 1: Visible, 2: Fade Out
+	var face_id: String; var children = []; var center: Vector3
 
-	func _init(_n, _a, _b, _l, _o, _s, _p, _f):
-		normal = _n; axis_a = _a; axis_b = _b; level = _l; offset = _o; size = _s; planet = _p; face_id = _f
-		var uv = offset + Vector2(0.5, 0.5) * size
-		var lp = (normal + axis_a * (uv.x - 0.5) * 2.0 + axis_b * (uv.y - 0.5) * 2.0).normalized()
+	func _init(_n, _a, _b, _l, _o, _s, _f):
+		normal = _n; axis_a = _a; axis_b = _b; level = _l; offset = _o; size = _s; face_id = _f
+		var lp = (normal + axis_a * (offset.x + size*0.5 - 0.5) * 2.0 + axis_b * (offset.y + size*0.5 - 0.5) * 2.0).normalized()
 		if face_id in ["A", "B", "E", "F"]: lp = lp.rotated(Vector3(0, 0, 1), -PI).rotated(Vector3(0, 1, 0), PI)
-		base_center = lp; planet.build_queue.append(self)
+		center = lp
 
-	func _generate_mesh_final():
-		var st = SurfaceTool.new(); st.begin(Mesh.PRIMITIVE_TRIANGLES)
-		var res = planet.resolution
-		for y in range(res + 1):
-			for x in range(res + 1):
-				var uv = offset + (Vector2(x, y) / float(res)) * size
-				var p = (normal + axis_a * (uv.x - 0.5) * 2.0 + axis_b * (uv.y - 0.5) * 2.0).normalized()
-				if face_id in ["A", "B", "E", "F"]: p = p.rotated(Vector3(0, 0, 1), -PI).rotated(Vector3(0, 1, 0), PI)
-				st.set_normal(p); st.set_uv(uv); st.add_vertex(p * planet.radius)
-		for y in range(res):
-			for x in range(res):
-				var i = x + y * (res + 1)
-				st.add_index(i); st.add_index(i+1); st.add_index(i+res+1); st.add_index(i+1); st.add_index(i+res+2); st.add_index(i+res+1)
-		mesh_instance = MeshInstance3D.new(); mesh_instance.mesh = st.commit()
-		mesh_instance.custom_aabb = AABB(Vector3(-planet.radius*2,-planet.radius*2,-planet.radius*2), Vector3(planet.radius*4,planet.radius*4,planet.radius*4))
-		add_child(mesh_instance)
-		var mat = ShaderMaterial.new(); mat.shader = Shader.new(); mat.shader.code = planet.LOD_SHADER
-		mat.set_shader_parameter("h_scale", planet.height_scale); mat.set_shader_parameter("fade", 0.0); mat.set_shader_parameter("wireframe", planet.wireframe_mode)
-		for i in planet._face_textures[face_id].size(): mat.set_shader_parameter("t"+str(i+1), planet._face_textures[face_id][i])
-		for i in planet._height_textures[face_id].size(): mat.set_shader_parameter("h"+str(i+1), planet._height_textures[face_id][i])
-		mesh_instance.set_surface_override_material(0, mat)
-
-	func update_lod(cam_pos: Vector3, delta: float):
-		# Process fade for self
-		if mesh_instance:
-			var mat = mesh_instance.get_surface_override_material(0)
-			if state == 0:
-				current_fade = clamp(current_fade + delta / planet.fade_duration, 0.0, 1.0)
-				mat.set_shader_parameter("fade", current_fade)
-				if current_fade >= 1.0: state = 1
-			elif state == 2:
-				current_fade = clamp(current_fade - delta / planet.fade_duration, 0.0, 1.0)
-				mat.set_shader_parameter("fade", current_fade)
-				if current_fade <= 0.0:
-					if children.is_empty(): queue_free(); return
-
-		# LOD logic
-		var dist = (planet.global_transform * (base_center * (planet.radius + planet.height_scale))).distance_to(cam_pos)
-		var should_split = dist < (planet.radius / pow(2.0, level)) * planet.lod_threshold and level < planet.max_lod
-		if state == 2: should_split = false # Force collapse if we're dying
-
-		if should_split:
-			if children.is_empty(): _split()
-		else:
-			if not children.is_empty(): _merge()
-
-		# Update children and cleanup freed ones (CRASH FIX)
-		var children_ready = true
-		var i = children.size() - 1
-		while i >= 0:
-			var c = children[i]
-			if is_instance_valid(c):
-				c.update_lod(cam_pos, delta)
-				if c.state != 1: children_ready = false
-			else:
-				children.remove_at(i)
-			i -= 1
-
-		# Visibility hand-off
-		if not children.is_empty():
-			if should_split and children_ready:
-				if mesh_instance and mesh_instance.visible: mesh_instance.visible = false
-			elif not should_split or state == 2:
-				if mesh_instance and not mesh_instance.visible: mesh_instance.visible = true
-		elif mesh_instance and not mesh_instance.visible:
-			mesh_instance.visible = true
+	func update_lod(cam_pos: Vector3, rad: float, max_l: int, thresh: float, trans: Transform3D) -> bool:
+		var dist = (trans * (center * rad)).distance_to(cam_pos)
+		var should_split = dist < (rad / pow(2.0, level)) * thresh and level < max_l
+		var changed = false
+		if should_split and children.is_empty():
+			_split(); changed = true
+		elif not should_split and not children.is_empty():
+			children.clear(); changed = true
+		for c in children:
+			if c.update_lod(cam_pos, rad, max_l, thresh, trans): changed = true
+		return changed
 
 	func _split():
 		var s = size * 0.5
 		for o in [Vector2.ZERO, Vector2(s,0), Vector2(0,s), Vector2(s,s)]:
-			var child = PlanetQuad.new(normal, axis_a, axis_b, level + 1, offset + o, s, planet, face_id)
-			children.append(child); add_child(child)
+			children.append(QuadData.new(normal, axis_a, axis_b, level + 1, offset + o, s, face_id))
 
-	func _merge():
-		for c in children: if is_instance_valid(c): c._trigger_recursive_death()
-		if not mesh_instance: planet.build_queue.append(self)
-
-	func _trigger_recursive_death():
-		state = 2
-		for c in children: if is_instance_valid(c): c._trigger_recursive_death()
-
-func _set_radius(v): radius = v; if Engine.is_editor_hint(): _init_planet()
-func _set_lod(v): max_lod = v; if Engine.is_editor_hint(): _init_planet()
-func _set_hscale(v): height_scale = v; if Engine.is_editor_hint(): _init_planet()
-func _set_wireframe(v): 
-	wireframe_mode = v
-	if terrain_node: for f in terrain_node.get_children(): _apply_wire(f, v)
-func _apply_wire(n, v):
-	if n is PlanetQuad and n.mesh_instance:
-		var m = n.mesh_instance.get_surface_override_material(0)
-		if m: m.set_shader_parameter("wireframe", v)
-	for c in n.get_children(): _apply_wire(c, v)
-func _spawn_trigger(v): if v: _init_planet(); spawn_planet = false
+# Setters
+func _set_radius(v): radius = v; if Engine.is_editor_hint(): _init_monolith_node()
+func _set_lod(v): max_lod = v; if Engine.is_editor_hint(): _init_monolith_node()
+func _set_hscale(v): height_scale = v; if Engine.is_editor_hint(): _init_monolith_node()
+func _trigger_build(v): if v: _init_monolith_node(); build_planet = false
