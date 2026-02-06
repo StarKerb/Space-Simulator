@@ -14,7 +14,6 @@ extends Node3D
 
 @export_group("Terrain Settings")
 @export var height_scale: float = 15.0 : set = _set_hscale 
-@export var uv_stretch: float = 0.01 : set = _set_stretch
 @export var build_planet: bool = false : set = _trigger_build
 
 var camera: Camera3D
@@ -26,7 +25,7 @@ var _pending_updates: Dictionary = {}
 
 const MONOLITH_SHADER = """
 shader_type spatial;
-render_mode cull_back, depth_draw_always;
+render_mode cull_back, depth_draw_always, shadows_disabled;
 
 uniform sampler2D t1 : source_color, filter_linear_mipmap_anisotropic;
 uniform sampler2D t2 : source_color, filter_linear_mipmap_anisotropic;
@@ -38,58 +37,68 @@ uniform sampler2D h3 : filter_linear_mipmap;
 uniform sampler2D h4 : filter_linear_mipmap;
 
 uniform float h_scale = 5.0;
-uniform float stretch = 0.01; 
+// Hillshade settings. Light dir is normalized (x, y, z)
+uniform vec3 light_dir = vec3(-0.5, 0.5, 0.2); 
+uniform float hillshade_intensity = 0.5;
+
 varying vec2 v_uv;
 
-// This remaps the UVs to stretch the texture edges outward
-vec2 get_stretched_uv(vec2 uv) {
-    // We remap the 0.0-1.0 range to basically -stretch to 1.0+stretch 
-    // and then clamp to ensure we don't go out of bounds.
-    // This pulls the edge pixels toward the center of the mesh face.
-    return clamp(uv * (1.0 + 2.0 * stretch) - stretch, 0.0, 1.0);
-}
-
 float get_h(vec2 uv) {
-	vec2 cuv = clamp(uv, 0.0, 1.0); 
-	if (cuv.y < 0.5) {
-		if (cuv.x < 0.5) return texture(h1, get_stretched_uv(cuv * 2.0)).r;
-		return texture(h2, get_stretched_uv(vec2(cuv.x - 0.5, cuv.y) * 2.0)).r;
-	} else {
-		if (cuv.x < 0.5) return texture(h3, get_stretched_uv(vec2(cuv.x, cuv.y - 0.5) * 2.0)).r;
-		return texture(h4, get_stretched_uv((cuv - 0.5) * 2.0)).r;
-	}
+    vec2 cuv = clamp(uv, 0.0, 1.0); 
+    float m = 0.001; 
+    
+    if (cuv.y < 0.5) {
+        if (cuv.x < 0.5) return texture(h1, clamp(cuv * 2.0, m, 1.0 - m)).r;
+        return texture(h2, clamp(vec2(cuv.x - 0.5, cuv.y) * 2.0, m, 1.0 - m)).r;
+    } else {
+        if (cuv.x < 0.5) return texture(h3, clamp(vec2(cuv.x, cuv.y - 0.5) * 2.0, m, 1.0 - m)).r;
+        return texture(h4, clamp((cuv - 0.5) * 2.0, m, 1.0 - m)).r;
+    }
 }
 
 void vertex() {
-	v_uv = UV;
-	float h = get_h(v_uv);
-	VERTEX += NORMAL * (h * h_scale);
+    v_uv = UV;
+    float h = get_h(v_uv);
+    VERTEX += NORMAL * (h * h_scale);
 }
 
 void fragment() {
-	vec3 tex_color;
-	if (v_uv.y < 0.5) {
-		if (v_uv.x < 0.5) tex_color = texture(t1, get_stretched_uv(v_uv * 2.0)).rgb;
-		else tex_color = texture(t2, get_stretched_uv(vec2(v_uv.x - 0.5, v_uv.y) * 2.0)).rgb;
-	} else {
-		if (v_uv.x < 0.5) tex_color = texture(t3, get_stretched_uv(vec2(v_uv.x, v_uv.y - 0.5) * 2.0)).rgb;
-		else tex_color = texture(t4, get_stretched_uv((v_uv - 0.5) * 2.0)).rgb;
-	}
+    float m = 0.001;
+    vec3 tex_color;
+    
+    // Albedo Splice
+    if (v_uv.y < 0.5) {
+        if (v_uv.x < 0.5) tex_color = texture(t1, clamp(v_uv * 2.0, m, 1.0 - m)).rgb;
+        else tex_color = texture(t2, clamp(vec2(v_uv.x - 0.5, v_uv.y) * 2.0, m, 1.0 - m)).rgb;
+    } else {
+        if (v_uv.x < 0.5) tex_color = texture(t3, clamp(vec2(v_uv.x, v_uv.y - 0.5) * 2.0, m, 1.0 - m)).rgb;
+        else tex_color = texture(t4, clamp((v_uv - 0.5) * 2.0, m, 1.0 - m)).rgb;
+    }
 
-	float e = 0.001; 
-	float h_l = get_h(v_uv - vec2(e, 0.0));
-	float h_r = get_h(v_uv + vec2(e, 0.0));
-	float h_d = get_h(v_uv - vec2(0.0, e));
-	float h_u = get_h(v_uv + vec2(0.0, e));
-	
-	vec3 va = normalize(vec3(2.0 * e, 0.0, (h_r - h_l) * h_scale));
-	vec3 vb = normalize(vec3(0.0, 2.0 * e, (h_u - h_d) * h_scale));
-	vec3 bump_normal = normalize(cross(va, vb));
-	
-	ALBEDO = tex_color;
-	NORMAL = mix(NORMAL, (VIEW_MATRIX * vec4(bump_normal, 0.0)).xyz, 0.4); 
-	ROUGHNESS = 0.9;
-	SPECULAR = 0.05;
+    // Hillshading Calc
+    float e = 0.002; // Epsilon for neighbor lookup
+    float h_c = get_h(v_uv);
+    float h_r = get_h(v_uv + vec2(e, 0.0));
+    float h_d = get_h(v_uv + vec2(0.0, e));
+
+    // Calculate slope vectors
+    // Adjust scale factor to make normals punchy enough
+    float d_x = (h_c - h_r) * h_scale;
+    float d_y = (h_c - h_d) * h_scale;
+
+    // Construct a pseudo-normal (approximate)
+    vec3 normal = normalize(vec3(d_x, d_y, e));
+    
+    // Dot product with light
+    float shade = dot(normal, normalize(light_dir));
+    
+    // Remap -1..1 to 0..1 and mix with intensity
+    shade = clamp((shade + 1.0) * 0.5, 0.0, 1.0);
+    vec3 final_shade = mix(vec3(1.0), vec3(shade), hillshade_intensity);
+
+    ALBEDO = tex_color * final_shade;
+    ROUGHNESS = 1.0;
+    SPECULAR = 0.0;
 }
 """
 
@@ -141,12 +150,17 @@ func _threaded_gen(face_id: String, root_q: QuadData):
 		var v_offset = verts.size()
 		for y in range(res + 1):
 			for x in range(res + 1):
-				var uv = q.offset + (Vector2(x, y) / float(res)) * q.size
+				var raw_t = Vector2(x, y) / float(res)
+				var uv = q.offset + raw_t * q.size
+				
 				var p = (q.normal + q.axis_a * (uv.x - 0.5) * 2.0 + q.axis_b * (uv.y - 0.5) * 2.0).normalized()
+				
 				if q.face_id in ["A", "B", "E", "F"]: 
 					p = p.rotated(Vector3(0,0,1),-PI).rotated(Vector3(0,1,0),PI)
 				
-				verts.append(p * radius); uvs.append(uv); norms.append(p)
+				verts.append(p * radius)
+				uvs.append(uv)
+				norms.append(p)
 				
 		for y in range(res):
 			for x in range(res):
@@ -163,7 +177,6 @@ func _apply_mesh(fid, v, u, n, idx):
 	
 	var mat = ShaderMaterial.new(); mat.shader = Shader.new(); mat.shader.code = MONOLITH_SHADER
 	mat.set_shader_parameter("h_scale", height_scale)
-	mat.set_shader_parameter("stretch", uv_stretch)
 	for i in range(_face_textures[fid].size()):
 		mat.set_shader_parameter("t"+str(i+1), _face_textures[fid][i])
 		mat.set_shader_parameter("h"+str(i+1), _height_textures[fid][i])
@@ -213,5 +226,4 @@ class QuadData:
 func _set_radius(v): radius = v; if Engine.is_editor_hint(): _init_monolith_node()
 func _set_lod(v): max_lod = v; if Engine.is_editor_hint(): _init_monolith_node()
 func _set_hscale(v): height_scale = v; if Engine.is_editor_hint(): _init_monolith_node()
-func _set_stretch(v): uv_stretch = v; if Engine.is_editor_hint(): _init_monolith_node()
 func _trigger_build(v): if v: _init_monolith_node(); build_planet = false
