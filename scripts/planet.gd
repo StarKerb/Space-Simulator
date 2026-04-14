@@ -7,13 +7,17 @@ extends Node3D
 @export var max_lod: int = 6 : set = _set_lod
 @export var lod_threshold: float = 3.5 
 
+@export_group("Lighting & Shadows")
+@export var sun_intensity: float = 2.0 : set = _set_intensity
+@export var shadow_smoothness: float = 0.001 : set = _set_smoothness
+
 @export_group("Textures")
 @export_dir var color_dir: String = "res://assets/earth/color"
 @export_dir var height_dir: String = "res://assets/earth/height"
 @export var out_format: String = ".png"
 
 @export_group("Terrain Settings")
-@export var height_scale: float = 15.0 : set = _set_hscale 
+@export var height_scale: float = 25.0 : set = _set_hscale 
 @export var build_planet: bool = false : set = _trigger_build
 
 var camera: Camera3D
@@ -25,80 +29,72 @@ var _pending_updates: Dictionary = {}
 
 const MONOLITH_SHADER = """
 shader_type spatial;
-render_mode cull_back, depth_draw_always, shadows_disabled;
+render_mode diffuse_lambert, specular_disabled, unshaded;
 
 uniform sampler2D t1 : source_color, filter_linear_mipmap_anisotropic;
 uniform sampler2D t2 : source_color, filter_linear_mipmap_anisotropic;
 uniform sampler2D t3 : source_color, filter_linear_mipmap_anisotropic;
 uniform sampler2D t4 : source_color, filter_linear_mipmap_anisotropic;
-uniform sampler2D h1 : filter_linear_mipmap;
-uniform sampler2D h2 : filter_linear_mipmap;
-uniform sampler2D h3 : filter_linear_mipmap;
-uniform sampler2D h4 : filter_linear_mipmap;
 
-uniform float h_scale = 5.0;
-// Hillshade settings. Light dir is normalized (x, y, z)
-uniform vec3 light_dir = vec3(-0.5, 0.5, 0.2); 
-uniform float hillshade_intensity = 0.5;
+uniform sampler2D h1 : repeat_enable, filter_linear_mipmap_anisotropic;
+uniform sampler2D h2 : repeat_enable, filter_linear_mipmap_anisotropic;
+uniform sampler2D h3 : repeat_enable, filter_linear_mipmap_anisotropic;
+uniform sampler2D h4 : repeat_disable, filter_linear_mipmap_anisotropic;
+
+uniform float h_scale = 25.0;
+uniform float sun_strength = 2.0;
+uniform float blur_val = 0.001;
+uniform vec3 sun_dir_world = vec3(1.0, -1.0, 0.5);
 
 varying vec2 v_uv;
+varying vec3 v_normal;
+varying vec3 v_sun_local;
 
+// Edge-wrapped height sampling to delete the seam
 float get_h(vec2 uv) {
-    vec2 cuv = clamp(uv, 0.0, 1.0); 
-    float m = 0.001; 
-    
-    if (cuv.y < 0.5) {
-        if (cuv.x < 0.5) return texture(h1, clamp(cuv * 2.0, m, 1.0 - m)).r;
-        return texture(h2, clamp(vec2(cuv.x - 0.5, cuv.y) * 2.0, m, 1.0 - m)).r;
+    vec2 wrapped_uv = fract(uv); 
+    if (wrapped_uv.y < 0.5) {
+        if (wrapped_uv.x < 0.5) return texture(h1, wrapped_uv * 2.0).r;
+        return texture(h2, vec2(wrapped_uv.x - 0.5, wrapped_uv.y) * 2.0).r;
     } else {
-        if (cuv.x < 0.5) return texture(h3, clamp(vec2(cuv.x, cuv.y - 0.5) * 2.0, m, 1.0 - m)).r;
-        return texture(h4, clamp((cuv - 0.5) * 2.0, m, 1.0 - m)).r;
+        if (wrapped_uv.x < 0.5) return texture(h3, vec2(wrapped_uv.x, wrapped_uv.y - 0.5) * 2.0).r;
+        return texture(h4, (wrapped_uv - 0.5) * 2.0).r;
     }
 }
 
 void vertex() {
     v_uv = UV;
-    float h = get_h(v_uv);
+    v_normal = NORMAL;
+    v_sun_local = normalize((inverse(MODEL_MATRIX) * vec4(-sun_dir_world, 0.0)).xyz);
+    
+    float h = get_h(UV);
     VERTEX += NORMAL * (h * h_scale);
 }
 
 void fragment() {
-    float m = 0.001;
     vec3 tex_color;
-    
-    // Albedo Splice
     if (v_uv.y < 0.5) {
-        if (v_uv.x < 0.5) tex_color = texture(t1, clamp(v_uv * 2.0, m, 1.0 - m)).rgb;
-        else tex_color = texture(t2, clamp(vec2(v_uv.x - 0.5, v_uv.y) * 2.0, m, 1.0 - m)).rgb;
+        if (v_uv.x < 0.5) tex_color = texture(t1, v_uv * 2.0).rgb;
+        else tex_color = texture(t2, vec2(v_uv.x - 0.5, v_uv.y) * 2.0).rgb;
     } else {
-        if (v_uv.x < 0.5) tex_color = texture(t3, clamp(vec2(v_uv.x, v_uv.y - 0.5) * 2.0, m, 1.0 - m)).rgb;
-        else tex_color = texture(t4, clamp((v_uv - 0.5) * 2.0, m, 1.0 - m)).rgb;
+        if (v_uv.x < 0.5) tex_color = texture(t3, vec2(v_uv.x, v_uv.y - 0.5) * 2.0).rgb;
+        else tex_color = texture(t4, (v_uv - 0.5) * 2.0).rgb;
     }
 
-    // Hillshading Calc
-    float e = 0.002; // Epsilon for neighbor lookup
+    float s = max(blur_val, 0.0001);
+    
+    // Sample height with wrapping logic to bridge the gaps
     float h_c = get_h(v_uv);
-    float h_r = get_h(v_uv + vec2(e, 0.0));
-    float h_d = get_h(v_uv + vec2(0.0, e));
-
-    // Calculate slope vectors
-    // Adjust scale factor to make normals punchy enough
-    float d_x = (h_c - h_r) * h_scale;
-    float d_y = (h_c - h_d) * h_scale;
-
-    // Construct a pseudo-normal (approximate)
-    vec3 normal = normalize(vec3(d_x, d_y, e));
+    float h_l = get_h(v_uv + vec2(-s, 0.0));
+    float h_r = get_h(v_uv + vec2(s, 0.0));
+    float h_d = get_h(v_uv + vec2(0.0, -s));
+    float h_u = get_h(v_uv + vec2(0.0, s));
     
-    // Dot product with light
-    float shade = dot(normal, normalize(light_dir));
-    
-    // Remap -1..1 to 0..1 and mix with intensity
-    shade = clamp((shade + 1.0) * 0.5, 0.0, 1.0);
-    vec3 final_shade = mix(vec3(1.0), vec3(shade), hillshade_intensity);
+    vec3 slope = vec3((h_l - h_r) * h_scale, (h_d - h_u) * h_scale, 0.0);
+    vec3 manual_normal = normalize(v_normal + slope);
 
-    ALBEDO = tex_color * final_shade;
-    ROUGHNESS = 1.0;
-    SPECULAR = 0.0;
+    float dot_sun = max(dot(manual_normal, v_sun_local), 0.08);
+    ALBEDO = tex_color * dot_sun * sun_strength;
 }
 """
 
@@ -141,32 +137,22 @@ func _request_face_update(face_id: String, root_q: QuadData):
 func _threaded_gen(face_id: String, root_q: QuadData):
 	var active_quads = []
 	_collect_active_single_face(root_q, active_quads)
-	
 	var verts = PackedVector3Array(); var uvs = PackedVector2Array()
 	var norms = PackedVector3Array(); var indices = PackedInt32Array()
 	var res = resolution
-	
 	for q in active_quads:
 		var v_offset = verts.size()
 		for y in range(res + 1):
 			for x in range(res + 1):
 				var raw_t = Vector2(x, y) / float(res)
 				var uv = q.offset + raw_t * q.size
-				
 				var p = (q.normal + q.axis_a * (uv.x - 0.5) * 2.0 + q.axis_b * (uv.y - 0.5) * 2.0).normalized()
-				
-				if q.face_id in ["A", "B", "E", "F"]: 
-					p = p.rotated(Vector3(0,0,1),-PI).rotated(Vector3(0,1,0),PI)
-				
-				verts.append(p * radius)
-				uvs.append(uv)
-				norms.append(p)
-				
+				if q.face_id in ["A", "B", "E", "F"]: p = p.rotated(Vector3(0,0,1),-PI).rotated(Vector3(0,1,0),PI)
+				verts.append(p * radius); uvs.append(uv); norms.append(p)
 		for y in range(res):
 			for x in range(res):
 				var i = v_offset + x + y * (res + 1)
 				indices.append_array([i, i+1, i+res+1, i+1, i+res+2, i+res+1])
-	
 	call_deferred("_apply_mesh", face_id, verts, uvs, norms, indices)
 
 func _apply_mesh(fid, v, u, n, idx):
@@ -174,13 +160,13 @@ func _apply_mesh(fid, v, u, n, idx):
 	arr[Mesh.ARRAY_VERTEX] = v; arr[Mesh.ARRAY_TEX_UV] = u
 	arr[Mesh.ARRAY_NORMAL] = n; arr[Mesh.ARRAY_INDEX] = idx
 	var am = ArrayMesh.new(); am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
-	
 	var mat = ShaderMaterial.new(); mat.shader = Shader.new(); mat.shader.code = MONOLITH_SHADER
 	mat.set_shader_parameter("h_scale", height_scale)
+	mat.set_shader_parameter("sun_strength", sun_intensity)
+	mat.set_shader_parameter("blur_val", shadow_smoothness)
 	for i in range(_face_textures[fid].size()):
 		mat.set_shader_parameter("t"+str(i+1), _face_textures[fid][i])
 		mat.set_shader_parameter("h"+str(i+1), _height_textures[fid][i])
-	
 	am.surface_set_material(0, mat)
 	face_nodes[fid].mesh = am
 	_pending_updates.erase(fid)
@@ -225,5 +211,17 @@ class QuadData:
 
 func _set_radius(v): radius = v; if Engine.is_editor_hint(): _init_monolith_node()
 func _set_lod(v): max_lod = v; if Engine.is_editor_hint(): _init_monolith_node()
-func _set_hscale(v): height_scale = v; if Engine.is_editor_hint(): _init_monolith_node()
+func _set_hscale(v): height_scale = v; _update_shader_params()
+func _set_intensity(v): sun_intensity = v; _update_shader_params()
+func _set_smoothness(v): shadow_smoothness = v; _update_shader_params()
+
+func _update_shader_params():
+	for fn in face_nodes.values():
+		if fn.mesh:
+			var mat = fn.mesh.surface_get_material(0)
+			if mat: 
+				mat.set_shader_parameter("sun_strength", sun_intensity)
+				mat.set_shader_parameter("blur_val", shadow_smoothness)
+				mat.set_shader_parameter("h_scale", height_scale)
+
 func _trigger_build(v): if v: _init_monolith_node(); build_planet = false
