@@ -15,13 +15,15 @@ sky = SubResource("Sky_48b8c")
 ambient_light_source = 3
 ssao_radius = 0.86
 ssao_intensity = 16.0
+tonemap_mode = 3
+tonemap_white = 6.0
 
 [node name="Planet" type="Node3D" unique_id=1969590477]
 script = ExtResource("1_h8ms6")
-max_lod = 6
-lod_threshold = 2.0
+resolution = 32
 color_dir = "res://assets/planets/earth/tiles/colour"
 height_dir = "res://assets/planets/earth/tiles/height"
+normal_dir = "res://assets/planets/earth/tiles/normal"
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1120002160]
 environment = SubResource("Environment_3s4jt")
