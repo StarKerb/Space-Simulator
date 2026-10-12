@@ -12,6 +12,8 @@ Early development space simulation project made in Godot.
 - Volumetric raymarched clouds
 - Simple debug tools (wireframe, patch view)
 
+![Atmospheric Rendering](screenshots/Screenshot 2026-10-12 194230.png)
+
 ## Planned Features
 - Improved terrain accuracy
 - Scatter objects
