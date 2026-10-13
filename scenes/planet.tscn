@@ -1,10 +1,109 @@
 [gd_scene format=3 uid="uid://hgdfgc5qam2i"]
 
 [ext_resource type="Script" uid="uid://b6jnltpt4muy6" path="res://scripts/planet.gd" id="1_h8ms6"]
+[ext_resource type="Texture2D" uid="uid://cgo2ujd7sy1l8" path="res://assets/earth_landocean_16K.png" id="2_snw7a"]
 [ext_resource type="Texture2D" uid="uid://b06rleh07s46s" path="res://assets/HDR_silver_and_gold_nebulae.hdr" id="3_ggt7d"]
+[ext_resource type="Texture2D" uid="uid://beltfa5hf48ad" path="res://assets/planets/earth/clouds_4k.png" id="3_mleue"]
+[ext_resource type="Texture2D" uid="uid://cn81flcchlibc" path="res://assets/planets/earth/tiles/colour/A1.png" id="4_ubuui"]
+[ext_resource type="Texture2D" uid="uid://cwgrojcfyygxv" path="res://assets/planets/earth/tiles/colour/A2.png" id="5_qlm0v"]
+[ext_resource type="Texture2D" uid="uid://07xccm23v6h" path="res://assets/planets/earth/tiles/colour/A3.png" id="6_2loqb"]
+[ext_resource type="Texture2D" uid="uid://dcgvddpv64m25" path="res://assets/planets/earth/tiles/colour/A4.png" id="7_gfhy8"]
+[ext_resource type="Texture2D" uid="uid://iwx8dotfkaxl" path="res://assets/planets/earth/tiles/height/A1.png" id="8_skctg"]
+[ext_resource type="Texture2D" uid="uid://do2a3re6rvec5" path="res://assets/planets/earth/tiles/height/A2.png" id="9_oft13"]
+[ext_resource type="Texture2D" uid="uid://d0g3048bxrunt" path="res://assets/planets/earth/tiles/height/A3.png" id="10_st745"]
+[ext_resource type="Texture2D" uid="uid://du2if0hqdm8pl" path="res://assets/planets/earth/tiles/height/A4.png" id="11_xbi58"]
+[ext_resource type="Texture2D" uid="uid://co036to3g6heq" path="res://assets/planets/earth/tiles/normal/A1.png" id="12_djjgj"]
+[ext_resource type="Texture2D" uid="uid://c846fbae2qbwv" path="res://assets/planets/earth/tiles/normal/A2.png" id="13_tyiqk"]
+[ext_resource type="Texture2D" uid="uid://buuqhatceenog" path="res://assets/planets/earth/tiles/normal/A3.png" id="14_rb0ie"]
+[ext_resource type="Texture2D" uid="uid://btw5hym6uu2m2" path="res://assets/planets/earth/tiles/normal/A4.png" id="15_onj7m"]
+[ext_resource type="Texture2D" uid="uid://uhmum1yp2fee" path="res://assets/planets/earth/tiles/water/A1.png" id="16_mdm0n"]
+[ext_resource type="Texture2D" uid="uid://dytn7gqlumax7" path="res://assets/planets/earth/tiles/water/A2.png" id="17_hceky"]
+[ext_resource type="Texture2D" uid="uid://c0nfuk10ipbpm" path="res://assets/planets/earth/tiles/water/A3.png" id="18_6y6hc"]
+[ext_resource type="Texture2D" uid="uid://bqy3mxmesub2u" path="res://assets/planets/earth/tiles/water/A4.png" id="19_21p0r"]
+[ext_resource type="Texture2D" uid="uid://bx8o41fx1wlnp" path="res://assets/planets/earth/tiles/colour/B1.png" id="20_i68ix"]
+[ext_resource type="Texture2D" uid="uid://3c3yt5ar0jki" path="res://assets/planets/earth/tiles/colour/B2.png" id="21_jtnlc"]
+[ext_resource type="Texture2D" uid="uid://igobdb61j415" path="res://assets/planets/earth/tiles/colour/B3.png" id="22_p50gb"]
+[ext_resource type="Texture2D" uid="uid://4rch3rjxlx2x" path="res://assets/planets/earth/tiles/colour/B4.png" id="23_5kxja"]
+[ext_resource type="Texture2D" uid="uid://bgxe0724ws7jk" path="res://assets/planets/earth/tiles/height/B1.png" id="24_s65mn"]
+[ext_resource type="Texture2D" uid="uid://bl3jbjhqfhh30" path="res://assets/planets/earth/tiles/height/B2.png" id="25_gnsbg"]
+[ext_resource type="Texture2D" uid="uid://eo3mwcdikkqc" path="res://assets/planets/earth/tiles/height/B3.png" id="26_3vusq"]
+[ext_resource type="Texture2D" uid="uid://b1rk3mgc5upqc" path="res://assets/planets/earth/tiles/height/B4.png" id="27_djdd5"]
+[ext_resource type="Texture2D" uid="uid://bll6s2fax42p3" path="res://assets/planets/earth/tiles/normal/B1.png" id="28_2k5hu"]
+[ext_resource type="Texture2D" uid="uid://c32hkg458o7ek" path="res://assets/planets/earth/tiles/normal/B2.png" id="29_b65qy"]
+[ext_resource type="Texture2D" uid="uid://lsmp5h7bkisu" path="res://assets/planets/earth/tiles/normal/B3.png" id="30_yh2fo"]
+[ext_resource type="Texture2D" uid="uid://1g1urib5m08f" path="res://assets/planets/earth/tiles/normal/B4.png" id="31_n1lik"]
+[ext_resource type="Texture2D" uid="uid://dhh1vme4vu225" path="res://assets/planets/earth/tiles/water/B1.png" id="32_xyxm1"]
+[ext_resource type="Texture2D" uid="uid://dn4qyg7cqlejt" path="res://assets/planets/earth/tiles/water/B2.png" id="33_3ssr0"]
+[ext_resource type="Texture2D" uid="uid://dwrghy78awygk" path="res://assets/planets/earth/tiles/water/B3.png" id="34_noth1"]
+[ext_resource type="Texture2D" uid="uid://5u5u3edekrno" path="res://assets/planets/earth/tiles/water/B4.png" id="35_sa35b"]
+[ext_resource type="Texture2D" uid="uid://bjhpjcnp4m4j5" path="res://assets/planets/earth/tiles/colour/C1.png" id="36_biov1"]
+[ext_resource type="Texture2D" uid="uid://bjatt7s7aqw2t" path="res://assets/planets/earth/tiles/colour/C2.png" id="37_fkn2k"]
+[ext_resource type="Texture2D" uid="uid://goc7b7o7vf4y" path="res://assets/planets/earth/tiles/colour/C3.png" id="38_gkfdt"]
+[ext_resource type="Texture2D" uid="uid://c72lj03ftvuqq" path="res://assets/planets/earth/tiles/colour/C4.png" id="39_esust"]
+[ext_resource type="Texture2D" uid="uid://demlm4fdxrnb6" path="res://assets/planets/earth/tiles/height/C1.png" id="40_504v8"]
+[ext_resource type="Texture2D" uid="uid://dep6otakt81io" path="res://assets/planets/earth/tiles/height/C2.png" id="41_ctcpn"]
+[ext_resource type="Texture2D" uid="uid://bdkbkt5vq57q8" path="res://assets/planets/earth/tiles/height/C3.png" id="42_kdvyq"]
+[ext_resource type="Texture2D" uid="uid://xcjtosh26rp5" path="res://assets/planets/earth/tiles/height/C4.png" id="43_oppl2"]
+[ext_resource type="Texture2D" uid="uid://d0eb3eg5irfa3" path="res://assets/planets/earth/tiles/normal/C1.png" id="44_2rtis"]
+[ext_resource type="Texture2D" uid="uid://cg680yi8urobw" path="res://assets/planets/earth/tiles/normal/C2.png" id="45_w6oe4"]
+[ext_resource type="Texture2D" uid="uid://druj5av20gghk" path="res://assets/planets/earth/tiles/normal/C3.png" id="46_rtwbb"]
+[ext_resource type="Texture2D" uid="uid://do23mm5r1xe1e" path="res://assets/planets/earth/tiles/normal/C4.png" id="47_0bpca"]
+[ext_resource type="Texture2D" uid="uid://dw46wquacdokd" path="res://assets/planets/earth/tiles/water/C1.png" id="48_kwmno"]
+[ext_resource type="Texture2D" uid="uid://xydmp6a5lgqv" path="res://assets/planets/earth/tiles/water/C2.png" id="49_w5pce"]
+[ext_resource type="Texture2D" uid="uid://bp47hk3yebu2g" path="res://assets/planets/earth/tiles/water/C3.png" id="50_7s21y"]
+[ext_resource type="Texture2D" uid="uid://dpvpsei4jdr33" path="res://assets/planets/earth/tiles/water/C4.png" id="51_qm26k"]
+[ext_resource type="Texture2D" uid="uid://nemlqi2u3m20" path="res://assets/planets/earth/tiles/colour/D1.png" id="52_ihsqh"]
+[ext_resource type="Texture2D" uid="uid://c2hvhxhgj4pl4" path="res://assets/planets/earth/tiles/colour/D2.png" id="53_phr8n"]
+[ext_resource type="Texture2D" uid="uid://bv73l2f2857p8" path="res://assets/planets/earth/tiles/colour/D3.png" id="54_c81er"]
+[ext_resource type="Texture2D" uid="uid://dioy4m4p46op3" path="res://assets/planets/earth/tiles/colour/D4.png" id="55_fwg12"]
+[ext_resource type="Texture2D" uid="uid://dy6nigelf3emx" path="res://assets/planets/earth/tiles/height/D1.png" id="56_blb6f"]
+[ext_resource type="Texture2D" uid="uid://um8x87bqbogi" path="res://assets/planets/earth/tiles/height/D2.png" id="57_jok87"]
+[ext_resource type="Texture2D" uid="uid://1suc8t1641fq" path="res://assets/planets/earth/tiles/height/D3.png" id="58_7oywn"]
+[ext_resource type="Texture2D" uid="uid://dchis1mx481y2" path="res://assets/planets/earth/tiles/height/D4.png" id="59_0bpq6"]
+[ext_resource type="Texture2D" uid="uid://dcfx1t0vx034g" path="res://assets/planets/earth/tiles/normal/D1.png" id="60_mlw6k"]
+[ext_resource type="Texture2D" uid="uid://daij765twj63h" path="res://assets/planets/earth/tiles/normal/D2.png" id="61_2isiu"]
+[ext_resource type="Texture2D" uid="uid://dno178ddtu5cs" path="res://assets/planets/earth/tiles/normal/D3.png" id="62_11mnw"]
+[ext_resource type="Texture2D" uid="uid://bf1cdb1jdso3e" path="res://assets/planets/earth/tiles/normal/D4.png" id="63_v1vdk"]
+[ext_resource type="Texture2D" uid="uid://oavcddytm1j7" path="res://assets/planets/earth/tiles/water/D1.png" id="64_obqis"]
+[ext_resource type="Texture2D" uid="uid://dgpwrpnvee7c4" path="res://assets/planets/earth/tiles/water/D2.png" id="65_w7sge"]
+[ext_resource type="Texture2D" uid="uid://dk6texctw0rs" path="res://assets/planets/earth/tiles/water/D3.png" id="66_l26ne"]
+[ext_resource type="Texture2D" uid="uid://b7ckjamtu6vu" path="res://assets/planets/earth/tiles/water/D4.png" id="67_sirfv"]
+[ext_resource type="Texture2D" uid="uid://clrff1jvafuio" path="res://assets/planets/earth/tiles/colour/E1.png" id="68_qe360"]
+[ext_resource type="Texture2D" uid="uid://bxdbu2ldwd7v5" path="res://assets/planets/earth/tiles/colour/E2.png" id="69_3b0yn"]
+[ext_resource type="Texture2D" uid="uid://b7mr0fy7bo212" path="res://assets/planets/earth/tiles/colour/E3.png" id="70_mpqyn"]
+[ext_resource type="Texture2D" uid="uid://cgnsg1i1ndjjc" path="res://assets/planets/earth/tiles/colour/E4.png" id="71_mc1kr"]
+[ext_resource type="Texture2D" uid="uid://c3pj1354o2avu" path="res://assets/planets/earth/tiles/height/E1.png" id="72_d7jmp"]
+[ext_resource type="Texture2D" uid="uid://djxxusorm63mc" path="res://assets/planets/earth/tiles/height/E2.png" id="73_try8g"]
+[ext_resource type="Texture2D" uid="uid://b8s5a86j26ghh" path="res://assets/planets/earth/tiles/height/E3.png" id="74_kx2wi"]
+[ext_resource type="Texture2D" uid="uid://dm2mbxf3uvki" path="res://assets/planets/earth/tiles/height/E4.png" id="75_q27lt"]
+[ext_resource type="Texture2D" uid="uid://bh01f4st3sare" path="res://assets/planets/earth/tiles/normal/E1.png" id="76_glr5i"]
+[ext_resource type="Texture2D" uid="uid://h5juqxy2xywq" path="res://assets/planets/earth/tiles/normal/E2.png" id="77_tkha5"]
+[ext_resource type="Texture2D" uid="uid://dp3kf005kcjnj" path="res://assets/planets/earth/tiles/normal/E3.png" id="78_33xpo"]
+[ext_resource type="Texture2D" uid="uid://cut5hd6lne5cp" path="res://assets/planets/earth/tiles/normal/E4.png" id="79_s2xyy"]
+[ext_resource type="Texture2D" uid="uid://cr1vvnoouopcm" path="res://assets/planets/earth/tiles/water/E1.png" id="80_gghxd"]
+[ext_resource type="Texture2D" uid="uid://bawrgs2ur8gnl" path="res://assets/planets/earth/tiles/water/E2.png" id="81_yefci"]
+[ext_resource type="Texture2D" uid="uid://bugdjeelnfdbx" path="res://assets/planets/earth/tiles/water/E3.png" id="82_mw7ew"]
+[ext_resource type="Texture2D" uid="uid://jvq2rveq24tf" path="res://assets/planets/earth/tiles/water/E4.png" id="83_gj8bu"]
+[ext_resource type="Texture2D" uid="uid://dyydruuq2n47" path="res://assets/planets/earth/tiles/colour/F1.png" id="84_dn0ov"]
+[ext_resource type="Texture2D" uid="uid://ctb0mk28k0808" path="res://assets/planets/earth/tiles/colour/F2.png" id="85_0qfkv"]
+[ext_resource type="Texture2D" uid="uid://s1fsssi3eam0" path="res://assets/planets/earth/tiles/colour/F3.png" id="86_3uwpb"]
+[ext_resource type="Texture2D" uid="uid://dup78qxpg048h" path="res://assets/planets/earth/tiles/colour/F4.png" id="87_rpryq"]
+[ext_resource type="Texture2D" uid="uid://dg5wk8vpq5nu8" path="res://assets/planets/earth/tiles/height/F1.png" id="88_d7hww"]
+[ext_resource type="Texture2D" uid="uid://bnokw64igdkhv" path="res://assets/planets/earth/tiles/height/F2.png" id="89_ylx2n"]
+[ext_resource type="Texture2D" uid="uid://bl2wycie6mckh" path="res://assets/planets/earth/tiles/height/F3.png" id="90_u04fk"]
+[ext_resource type="Texture2D" uid="uid://cf4uwhx0icvdm" path="res://assets/planets/earth/tiles/height/F4.png" id="91_lw842"]
+[ext_resource type="Texture2D" uid="uid://btqondq53ucyw" path="res://assets/planets/earth/tiles/normal/F1.png" id="92_y1a8d"]
+[ext_resource type="Texture2D" uid="uid://clivcosiy76yu" path="res://assets/planets/earth/tiles/normal/F2.png" id="93_yhb1d"]
+[ext_resource type="Texture2D" uid="uid://daggivvpei4at" path="res://assets/planets/earth/tiles/normal/F3.png" id="94_qo70a"]
+[ext_resource type="Texture2D" uid="uid://bp4diwesmvm6i" path="res://assets/planets/earth/tiles/normal/F4.png" id="95_j5lfe"]
+[ext_resource type="Texture2D" uid="uid://4ettowjrqqbv" path="res://assets/planets/earth/tiles/water/F1.png" id="96_ry4k2"]
+[ext_resource type="Texture2D" uid="uid://cui7d2mfgoccr" path="res://assets/planets/earth/tiles/water/F2.png" id="97_6fks3"]
+[ext_resource type="Texture2D" uid="uid://cuwm7i55x5nwh" path="res://assets/planets/earth/tiles/water/F3.png" id="98_swsja"]
+[ext_resource type="Texture2D" uid="uid://dn0imnouj3kon" path="res://assets/planets/earth/tiles/water/F4.png" id="99_1dakl"]
 
 [sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_0k1rn"]
 panorama = ExtResource("3_ggt7d")
+energy_multiplier = 0.9875106
 
 [sub_resource type="Sky" id="Sky_48b8c"]
 sky_material = SubResource("PanoramaSkyMaterial_0k1rn")
@@ -13,17 +112,93 @@ sky_material = SubResource("PanoramaSkyMaterial_0k1rn")
 background_mode = 2
 sky = SubResource("Sky_48b8c")
 ambient_light_source = 3
-ssao_radius = 0.86
-ssao_intensity = 16.0
 tonemap_mode = 3
 tonemap_white = 6.0
+ssao_radius = 0.86
+ssao_intensity = 16.0
+glow_enabled = true
+glow_normalized = true
+adjustment_brightness = 0.84
+adjustment_contrast = 1.055
+adjustment_saturation = 0.8
+
+[sub_resource type="CameraAttributesPractical" id="CameraAttributesPractical_gb5ld"]
+auto_exposure_enabled = true
+auto_exposure_scale = 0.2
+auto_exposure_speed = 3.0
+auto_exposure_min_sensitivity = 20.0
+auto_exposure_max_sensitivity = 640.0
 
 [node name="Planet" type="Node3D" unique_id=1969590477]
 script = ExtResource("1_h8ms6")
-resolution = 32
-color_dir = "res://assets/planets/earth/tiles/colour"
-height_dir = "res://assets/planets/earth/tiles/height"
-normal_dir = "res://assets/planets/earth/tiles/normal"
+ocean_water_mask = ExtResource("2_snw7a")
+cloud_texture = ExtResource("3_mleue")
+cloud_altitude = 2.248
+cloud_thickness = 3.703
+cloud_density = 0.15
+cloud_coverage = 1.0
+cloud_speed = 0.0
+cloud_noise_speed = 0.0
+cloud_map_height = 1.0
+cloud_map_density = 0.182
+cloud_shadow_intensity = 0.75
+cloud_edge_noise = 0.896
+cloud_self_shadow_intensity = 2.0
+cloud_terminator_depth = 0.0
+cloud_terminator_softness = 0.02
+cloud_terminator_offset = -0.08
+cloud_opacity = 5.0
+cloud_dither = 1.0
+noise_base_scale = 545.303
+noise_base_strength = 1.0
+noise_detail_scale = 1342.507
+noise_detail_strength = 1.0
+noise_l1_scale = 545.303
+noise_l1_strength = 1.0
+noise_l1_channel = 2
+noise_l2_scale = 1342.507
+noise_l2_strength = 1.0
+noise_l2_edge_only = 0.147
+noise_l2_channel = 2
+noise_l3_enabled = true
+noise_l3_scale = 2055.62
+noise_l3_strength = 1.0
+noise_l3_edge_only = 0.0
+noise_l4_enabled = true
+noise_l4_scale = 3408.646
+noise_l4_strength = 1.0
+noise_l4_channel = 2
+noise_l5_enabled = true
+noise_l5_scale = 5737.176
+noise_l5_strength = 1.0
+noise_l5_edge_only = 0.0
+noise_l5_channel = 2
+cloud_samples = 48
+face_a_color = Array[Texture2D]([ExtResource("4_ubuui"), ExtResource("5_qlm0v"), ExtResource("6_2loqb"), ExtResource("7_gfhy8")])
+face_a_height = Array[Texture2D]([ExtResource("8_skctg"), ExtResource("9_oft13"), ExtResource("10_st745"), ExtResource("11_xbi58")])
+face_a_normal = Array[Texture2D]([ExtResource("12_djjgj"), ExtResource("13_tyiqk"), ExtResource("14_rb0ie"), ExtResource("15_onj7m")])
+face_a_water = Array[Texture2D]([ExtResource("16_mdm0n"), ExtResource("17_hceky"), ExtResource("18_6y6hc"), ExtResource("19_21p0r")])
+face_b_color = Array[Texture2D]([ExtResource("20_i68ix"), ExtResource("21_jtnlc"), ExtResource("22_p50gb"), ExtResource("23_5kxja")])
+face_b_height = Array[Texture2D]([ExtResource("24_s65mn"), ExtResource("25_gnsbg"), ExtResource("26_3vusq"), ExtResource("27_djdd5")])
+face_b_normal = Array[Texture2D]([ExtResource("28_2k5hu"), ExtResource("29_b65qy"), ExtResource("30_yh2fo"), ExtResource("31_n1lik")])
+face_b_water = Array[Texture2D]([ExtResource("32_xyxm1"), ExtResource("33_3ssr0"), ExtResource("34_noth1"), ExtResource("35_sa35b")])
+face_c_color = Array[Texture2D]([ExtResource("36_biov1"), ExtResource("37_fkn2k"), ExtResource("38_gkfdt"), ExtResource("39_esust")])
+face_c_height = Array[Texture2D]([ExtResource("40_504v8"), ExtResource("41_ctcpn"), ExtResource("42_kdvyq"), ExtResource("43_oppl2")])
+face_c_normal = Array[Texture2D]([ExtResource("44_2rtis"), ExtResource("45_w6oe4"), ExtResource("46_rtwbb"), ExtResource("47_0bpca")])
+face_c_water = Array[Texture2D]([ExtResource("48_kwmno"), ExtResource("49_w5pce"), ExtResource("50_7s21y"), ExtResource("51_qm26k")])
+face_d_color = Array[Texture2D]([ExtResource("52_ihsqh"), ExtResource("53_phr8n"), ExtResource("54_c81er"), ExtResource("55_fwg12")])
+face_d_height = Array[Texture2D]([ExtResource("56_blb6f"), ExtResource("57_jok87"), ExtResource("58_7oywn"), ExtResource("59_0bpq6")])
+face_d_normal = Array[Texture2D]([ExtResource("60_mlw6k"), ExtResource("61_2isiu"), ExtResource("62_11mnw"), ExtResource("63_v1vdk")])
+face_d_water = Array[Texture2D]([ExtResource("64_obqis"), ExtResource("65_w7sge"), ExtResource("66_l26ne"), ExtResource("67_sirfv")])
+face_e_color = Array[Texture2D]([ExtResource("68_qe360"), ExtResource("69_3b0yn"), ExtResource("70_mpqyn"), ExtResource("71_mc1kr")])
+face_e_height = Array[Texture2D]([ExtResource("72_d7jmp"), ExtResource("73_try8g"), ExtResource("74_kx2wi"), ExtResource("75_q27lt")])
+face_e_normal = Array[Texture2D]([ExtResource("76_glr5i"), ExtResource("77_tkha5"), ExtResource("78_33xpo"), ExtResource("79_s2xyy")])
+face_e_water = Array[Texture2D]([ExtResource("80_gghxd"), ExtResource("81_yefci"), ExtResource("82_mw7ew"), ExtResource("83_gj8bu")])
+face_f_color = Array[Texture2D]([ExtResource("84_dn0ov"), ExtResource("85_0qfkv"), ExtResource("86_3uwpb"), ExtResource("87_rpryq")])
+face_f_height = Array[Texture2D]([ExtResource("88_d7hww"), ExtResource("89_ylx2n"), ExtResource("90_u04fk"), ExtResource("91_lw842")])
+face_f_normal = Array[Texture2D]([ExtResource("92_y1a8d"), ExtResource("93_yhb1d"), ExtResource("94_qo70a"), ExtResource("95_j5lfe")])
+face_f_water = Array[Texture2D]([ExtResource("96_ry4k2"), ExtResource("97_6fks3"), ExtResource("98_swsja"), ExtResource("99_1dakl")])
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1120002160]
 environment = SubResource("Environment_3s4jt")
+camera_attributes = SubResource("CameraAttributesPractical_gb5ld")

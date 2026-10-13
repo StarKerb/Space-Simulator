@@ -8,6 +8,7 @@ uniform vec3 planet_center = vec3(0.0);
 uniform vec3 sun_dir = vec3(0.0, 1.0, 0.0);
 uniform float sun_intensity = 2.0;
 uniform float planet_radius = 600.0;
+uniform vec3 camera_pos = vec3(0.0);
 
 uniform bool invert_clouds = false; // False by default: alpha = clouds, 0 = clear sky
 uniform float cloud_altitude = 6.0;
@@ -73,7 +74,7 @@ float fbm3D(vec3 p) {
 }
 
 void fragment() {
-	vec3 cam_pos = INV_VIEW_MATRIX[3].xyz;
+	vec3 cam_pos = (length(camera_pos) > 0.001) ? camera_pos : CAMERA_POSITION_WORLD;
 	vec3 ray_dir = normalize(v_world_pos - cam_pos);
 	vec3 sun_norm = -normalize(sun_dir);
 
@@ -114,12 +115,11 @@ void fragment() {
 	}
 
 	float raw_depth = texture(depth_texture, SCREEN_UV).r;
-	if (raw_depth > 0.0001) {
+	if (raw_depth > 0.0001 && raw_depth < 0.9999) {
 		vec4 ndc = vec4(SCREEN_UV * 2.0 - 1.0, raw_depth, 1.0);
 		vec4 view_pos = INV_PROJECTION_MATRIX * ndc;
 		view_pos.xyz /= view_pos.w;
-		vec3 world_pos = (INV_VIEW_MATRIX * vec4(view_pos.xyz, 1.0)).xyz;
-		float d_terrain = distance(cam_pos, world_pos);
+		float d_terrain = length(view_pos.xyz);
 		t_end = min(t_end, d_terrain);
 	}
 

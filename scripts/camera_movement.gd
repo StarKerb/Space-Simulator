@@ -1,5 +1,6 @@
 extends Camera3D
 
+@export var planet: Node3D : set = _set_planet
 @export var move_speed := 20.0
 @export var look_sensitivity := 0.003
 @export var fast_multiplier := 5.0 # Hold Shift to go Zoomies
@@ -10,15 +11,103 @@ var wireframe := false
 
 var _rmb_held := false
 var _imgui: Object = null
+var _prev_planet_transform: Transform3D = Transform3D.IDENTITY
+var _has_prev_planet_transform: bool = false
+var _horizon_heading: Vector3 = Vector3.FORWARD
+var _horizon_pitch: float = 0.0
+var _horizon_initialized: bool = false
+
+
+func _set_planet(val: Node3D) -> void:
+	planet = val
+	_horizon_initialized = false
+	if planet and planet.is_inside_tree():
+		_prev_planet_transform = planet.global_transform.orthonormalized()
+		_has_prev_planet_transform = true
+		if is_inside_tree():
+			_init_horizon_from_current_basis()
+	else:
+		_has_prev_planet_transform = false
 
 
 func _ready() -> void:
+	process_priority = -10
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	if planet and planet.is_inside_tree():
+		_prev_planet_transform = planet.global_transform.orthonormalized()
+		_has_prev_planet_transform = true
+	_init_horizon_from_current_basis()
 	if ClassDB.class_exists("ImGui"):
 		if Engine.has_singleton("ImGui"):
 			_imgui = Engine.get_singleton("ImGui")
 		else:
 			_imgui = ClassDB.instantiate("ImGui")
+
+
+func _get_horizon_up() -> Vector3:
+	if planet and planet.is_inside_tree():
+		var to_cam := global_position - planet.global_position
+		if to_cam.length_squared() > 0.0001:
+			return to_cam.normalized()
+	return Vector3.UP
+
+
+func _init_horizon_from_current_basis() -> void:
+	var u := _get_horizon_up()
+	var bx := global_transform.basis.x
+	var h := u.cross(bx)
+	if h.length_squared() < 0.0001:
+		var by := global_transform.basis.y
+		h = by - u * by.dot(u)
+		if h.length_squared() < 0.0001:
+			h = Vector3.FORWARD.cross(u)
+			if h.length_squared() < 0.0001:
+				h = Vector3.RIGHT.cross(u)
+	_horizon_heading = h.normalized()
+	var fwd := -global_transform.basis.z.normalized()
+	var cam_up := global_transform.basis.y.normalized()
+	var sin_p := fwd.dot(u)
+	var cos_p := maxf(fwd.dot(_horizon_heading), cam_up.dot(u))
+	_horizon_pitch = clampf(atan2(sin_p, cos_p), deg_to_rad(-89.0), deg_to_rad(89.0))
+	_horizon_initialized = true
+
+
+func _apply_horizon_basis(u: Vector3) -> void:
+	_horizon_heading = _horizon_heading - u * _horizon_heading.dot(u)
+	if _horizon_heading.length_squared() < 0.0001:
+		_init_horizon_from_current_basis()
+		return
+	_horizon_heading = _horizon_heading.normalized()
+	var right := _horizon_heading.cross(u).normalized()
+	var fwd := (_horizon_heading * cos(_horizon_pitch) + u * sin(_horizon_pitch)).normalized()
+	var cam_up := right.cross(fwd).normalized()
+	global_transform.basis = Basis(right, cam_up, -fwd).orthonormalized()
+
+
+func sync_with_planet() -> void:
+	if not planet or not planet.is_inside_tree():
+		_has_prev_planet_transform = false
+		return
+
+	if not _horizon_initialized:
+		_init_horizon_from_current_basis()
+
+	var cur_planet_xform := planet.global_transform.orthonormalized()
+	if not _has_prev_planet_transform:
+		_prev_planet_transform = cur_planet_xform
+		_has_prev_planet_transform = true
+		return
+
+	if cur_planet_xform.is_equal_approx(_prev_planet_transform):
+		return
+
+	var delta_basis := cur_planet_xform.basis * _prev_planet_transform.basis.inverse()
+	var rel_pos := global_position - _prev_planet_transform.origin
+	global_position = cur_planet_xform.origin + delta_basis * rel_pos
+	_horizon_heading = delta_basis * _horizon_heading
+	var u := _get_horizon_up()
+	_apply_horizon_basis(u)
+	_prev_planet_transform = cur_planet_xform
 
 
 func _is_mouse_over_gui() -> bool:
@@ -73,20 +162,21 @@ func _input(event: InputEvent) -> void:
 
 	# MOUSE LOOK (Only when mouse is locked!)
 	if mouse_locked and event is InputEventMouseMotion:
-		# 1. Yaw (Left/Right) — Rotate around Global Up (Vector3.UP)
-		global_rotate(Vector3.UP, -event.relative.x * look_sensitivity)
+		if not _horizon_initialized:
+			_init_horizon_from_current_basis()
 
-		# 2. Pitch (Up/Down) — Rotate around Local Right (Basis X)
-		rotate_object_local(Vector3.RIGHT, -event.relative.y * look_sensitivity)
+		var u := _get_horizon_up()
 
-		# 3. Prevent Backflips (Clamp Pitch)
-		rotation.x = clamp(rotation.x, deg_to_rad(-89), deg_to_rad(89))
+		# 1. Yaw (Left/Right) — Rotate around the planet's local horizon normal (u)
+		var yaw_delta: float = -event.relative.x * look_sensitivity
+		_horizon_heading = _horizon_heading.rotated(u, yaw_delta)
 
-		# 4. Force Z rotation to 0 to kill any accidental rolling
-		rotation.z = 0
+		# 2. Pitch (Up/Down) — Rotate relative to the planet's local horizon plane, clamped to [-89, 89] deg
+		var pitch_delta: float = -event.relative.y * look_sensitivity
+		_horizon_pitch = clampf(_horizon_pitch + pitch_delta, deg_to_rad(-89.0), deg_to_rad(89.0))
 
-		# 5. Clean up the matrix so it doesn't drift over time
-		transform = transform.orthonormalized()
+		# 3. Reconstruct orthonormal basis aligned with the planet's horizon (zero horizon roll)
+		_apply_horizon_basis(u)
 
 	# ESC to unlock mouse
 	if event.is_action_pressed("ui_cancel") or (event is InputEventKey and event.keycode == KEY_ESCAPE and event.pressed):
@@ -99,11 +189,16 @@ func _input(event: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
+	sync_with_planet()
 	if mouse_locked:
 		_move(delta)
 
 
 func _move(delta: float) -> void:
+	if not _horizon_initialized:
+		_init_horizon_from_current_basis()
+
+	var old_u := _get_horizon_up()
 	var dir := Vector3.ZERO
 
 	# Check for shift key to go fast
@@ -113,22 +208,26 @@ func _move(delta: float) -> void:
 
 	# Use Basis for direction so "Forward" is where you are looking
 	if Input.is_action_pressed("ui_forward"):
-		dir -= transform.basis.z
+		dir -= global_transform.basis.z
 	if Input.is_action_pressed("ui_backward"):
-		dir += transform.basis.z
+		dir += global_transform.basis.z
 	if Input.is_action_pressed("ui_left"):
-		dir -= transform.basis.x
+		dir -= global_transform.basis.x
 	if Input.is_action_pressed("ui_right"):
-		dir += transform.basis.x
+		dir += global_transform.basis.x
 
-	# Fly straight up/down in global space (feels better for debug)
+	# Fly straight up/down relative to the planet's local horizon normal
 	if Input.is_action_pressed("ui_up"):
-		dir += Vector3.UP
+		dir += old_u
 	if Input.is_action_pressed("ui_down"):
-		dir -= Vector3.UP
+		dir -= old_u
 
 	if dir != Vector3.ZERO:
-		position += dir.normalized() * speed * delta
+		global_position += dir.normalized() * speed * delta
+		var new_u := _get_horizon_up()
+		var arc := Quaternion(old_u, new_u)
+		_horizon_heading = arc * _horizon_heading
+		_apply_horizon_basis(new_u)
 
 
 func _lock_mouse() -> void:

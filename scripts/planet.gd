@@ -8,6 +8,8 @@ extends Node3D
 @export var resolution: int = 32
 @export var max_lod: int = 6 : set = _set_lod
 @export var lod_threshold: float = 3.5
+@export var planet_spin_enabled: bool = true : set = _set_planet_spin_enabled
+@export var planet_spin_speed: float = 0.005 : set = _set_planet_spin_speed
 
 @export_group("Lighting & Shadows")
 @export var sun_light: DirectionalLight3D : set = _set_sun_light
@@ -25,6 +27,14 @@ extends Node3D
 @export var ocean_shallow_color: Color = Color(0.04, 0.42, 0.58, 0.8) : set = _set_ocean_shallow
 @export var ocean_deep_color: Color = Color(0.01, 0.06, 0.18, 1.0) : set = _set_ocean_deep
 @export var ocean_depth_distance: float = 6.0 : set = _set_ocean_depth_distance
+@export var wave_amplitude: float = 0.28 : set = _set_wave_amplitude
+@export var wave_frequency: float = 1.0 : set = _set_wave_frequency
+@export var wave_speed: float = 1.2 : set = _set_wave_speed
+@export var wave_steepness: float = 0.65 : set = _set_wave_steepness
+@export var shore_foam_distance: float = 0.85 : set = _set_shore_foam_distance
+@export var crest_foam_threshold: float = 0.45 : set = _set_crest_foam_threshold
+@export var foam_intensity: float = 1.0 : set = _set_foam_intensity
+@export var ssr_enabled: bool = true : set = _set_ssr_enabled
 
 @export_group("Clouds")
 @export var cloud_enabled: bool = true : set = _set_cloud_enabled
@@ -35,26 +45,97 @@ extends Node3D
 @export var cloud_density: float = 0.8 : set = _set_cloud_density
 @export var cloud_coverage: float = 0.65 : set = _set_cloud_coverage
 @export var cloud_speed: float = 0.001 : set = _set_cloud_speed
+@export var cloud_noise_speed: float = 0.0001 : set = _set_cloud_noise_speed
+@export var cloud_noise_follow: float = 0.8 : set = _set_cloud_noise_follow
 @export var cloud_day_brightness: float = 2.0 : set = _set_cloud_day_brightness
 @export var cloud_night_brightness: float = 0.0 : set = _set_cloud_night_brightness
 @export var cloud_map_height: float = 0.8 : set = _set_cloud_map_height
 @export var cloud_map_density: float = 0.85 : set = _set_cloud_map_density
 @export var cloud_color: Color = Color(1.0, 1.0, 1.0, 1.0) : set = _set_cloud_color
 @export var cloud_shadow_color: Color = Color(0.18, 0.22, 0.32, 1.0) : set = _set_cloud_shadow_color
-@export var cloud_shadow_intensity: float = 0.75 : set = _set_cloud_shadow_intensity
+@export var cloud_shadow_intensity: float = 0.85 : set = _set_cloud_shadow_intensity
+@export var cloud_edge_noise: float = 0.85 : set = _set_cloud_edge_noise
+@export var cloud_noise_amount: float = 0.8 : set = _set_cloud_noise_amount
+@export var cloud_self_shadow_intensity: float = 1.0 : set = _set_cloud_self_shadow_intensity
+@export var cloud_terminator_depth: float = 1.0 : set = _set_cloud_terminator_depth
+@export var cloud_terminator_softness: float = 0.16 : set = _set_cloud_terminator_softness
+@export var cloud_sunset_tint: float = 0.0 : set = _set_cloud_sunset_tint
+@export var cloud_terminator_offset: float = 0.0 : set = _set_cloud_terminator_offset
+@export var cloud_opacity: float = 1.5 : set = _set_cloud_opacity
+@export var cloud_dither: float = 0.5 : set = _set_cloud_dither
 @export var noise_base_scale: float = 160.0 : set = _set_noise_base_scale
 @export var noise_base_strength: float = 0.35 : set = _set_noise_base_strength
 @export var noise_detail_scale: float = 400.0 : set = _set_noise_detail_scale
-@export var noise_detail_strength: float = 0.2 : set = _set_noise_detail_strength
+@export var noise_detail_strength: float = 0.25 : set = _set_noise_detail_strength
+
+@export_group("Cloud Noise Layers")
+@export var noise_l1_enabled: bool = true : set = _set_noise_l1_enabled
+@export var noise_l1_scale: float = 160.0 : set = _set_noise_l1_scale
+@export var noise_l1_strength: float = 0.35 : set = _set_noise_l1_strength
+@export var noise_l1_edge_only: float = 0.0 : set = _set_noise_l1_edge_only
+@export_enum("R:0", "G:1", "B:2", "A:3") var noise_l1_channel: int = 0 : set = _set_noise_l1_channel
+
+@export var noise_l2_enabled: bool = true : set = _set_noise_l2_enabled
+@export var noise_l2_scale: float = 400.0 : set = _set_noise_l2_scale
+@export var noise_l2_strength: float = 0.25 : set = _set_noise_l2_strength
+@export var noise_l2_edge_only: float = 0.65 : set = _set_noise_l2_edge_only
+@export_enum("R:0", "G:1", "B:2", "A:3") var noise_l2_channel: int = 1 : set = _set_noise_l2_channel
+
+@export var noise_l3_enabled: bool = false : set = _set_noise_l3_enabled
+@export var noise_l3_scale: float = 800.0 : set = _set_noise_l3_scale
+@export var noise_l3_strength: float = 0.20 : set = _set_noise_l3_strength
+@export var noise_l3_edge_only: float = 0.85 : set = _set_noise_l3_edge_only
+@export_enum("R:0", "G:1", "B:2", "A:3") var noise_l3_channel: int = 2 : set = _set_noise_l3_channel
+
+@export var noise_l4_enabled: bool = false : set = _set_noise_l4_enabled
+@export var noise_l4_scale: float = 1600.0 : set = _set_noise_l4_scale
+@export var noise_l4_strength: float = 0.15 : set = _set_noise_l4_strength
+@export var noise_l4_edge_only: float = 1.0 : set = _set_noise_l4_edge_only
+@export_enum("R:0", "G:1", "B:2", "A:3") var noise_l4_channel: int = 3 : set = _set_noise_l4_channel
+
+@export var noise_l5_enabled: bool = false : set = _set_noise_l5_enabled
+@export var noise_l5_scale: float = 2400.0 : set = _set_noise_l5_scale
+@export var noise_l5_strength: float = 0.15 : set = _set_noise_l5_strength
+@export var noise_l5_edge_only: float = 0.8 : set = _set_noise_l5_edge_only
+@export_enum("R:0", "G:1", "B:2", "A:3") var noise_l5_channel: int = 1 : set = _set_noise_l5_channel
+
+@export var noise_l6_enabled: bool = false : set = _set_noise_l6_enabled
+@export var noise_l6_scale: float = 3200.0 : set = _set_noise_l6_scale
+@export var noise_l6_strength: float = 0.12 : set = _set_noise_l6_strength
+@export var noise_l6_edge_only: float = 1.0 : set = _set_noise_l6_edge_only
+@export_enum("R:0", "G:1", "B:2", "A:3") var noise_l6_channel: int = 2 : set = _set_noise_l6_channel
+
+@export var noise_l7_enabled: bool = false : set = _set_noise_l7_enabled
+@export var noise_l7_scale: float = 4800.0 : set = _set_noise_l7_scale
+@export var noise_l7_strength: float = 0.10 : set = _set_noise_l7_strength
+@export_enum("R:0", "G:1", "B:2", "A:3") var noise_l7_channel: int = 0 : set = _set_noise_l7_channel
+@export var noise_l7_edge_only: float = 0.5 : set = _set_noise_l7_edge_only
+
+@export var noise_l8_enabled: bool = false : set = _set_noise_l8_enabled
+@export var noise_l8_scale: float = 6400.0 : set = _set_noise_l8_scale
+@export var noise_l8_strength: float = 0.08 : set = _set_noise_l8_strength
+@export var noise_l8_edge_only: float = 1.0 : set = _set_noise_l8_edge_only
+@export_enum("R:0", "G:1", "B:2", "A:3") var noise_l8_channel: int = 3 : set = _set_noise_l8_channel
+
+
+@export var cloud_samples: int = 16 : set = _set_cloud_samples
+@export var render_scale: float = 1.0 : set = _set_render_scale
+
+@export_group("Terrain & Normals")
+@export var normal_depth: float = 1.0 : set = _set_normal_depth
+@export var invert_normal_y: bool = false : set = _set_invert_normal_y
+@export var normal_orbital_ratio: float = 0.22 : set = _set_normal_orbital_ratio
+@export var normal_slope_threshold: float = 0.08 : set = _set_normal_slope_threshold
 
 @export_group("Atmosphere")
 @export var atmosphere_enabled: bool = true : set = _set_atmo_enabled
 @export var atmosphere_scale: float = 1.06 : set = _set_atmo_scale
-@export var rayleigh_coeff: Vector3 = Vector3(5.5e-6, 13.0e-6, 22.4e-6)
-@export var scale_height_rayleigh: float = 0.015
-@export var mie_coeff: float = 21.0e-6
-@export var mie_g: float = 0.76
-@export var scale_height_mie: float = 0.008
+@export var rayleigh_coeff: Vector3 = Vector3(0.0035, 0.0085, 0.021) : set = _set_rayleigh_coeff
+@export var scale_height_rayleigh: float = 0.015 : set = _set_scale_height_rayleigh
+@export var mie_coeff: float = 0.002 : set = _set_mie_coeff
+@export var mie_g: float = 0.76 : set = _set_mie_g
+@export var scale_height_mie: float = 0.008 : set = _set_scale_height_mie
+@export var godray_intensity: float = 1.0 : set = _set_godray_intensity
 
 @export_group("Eye Adaptation & Skybox")
 @export var eye_adaptation_enabled: bool = true : set = _set_eye_adaptation_enabled
@@ -118,11 +199,14 @@ var ocean_face_nodes: Dictionary = {}
 var _pending_updates: Dictionary = {}
 
 var _ocean_material: ShaderMaterial
+var _ocean_node: MeshInstance3D
 var _cloud_node: MeshInstance3D
 var _cloud_material: ShaderMaterial
 var _atmo_node: MeshInstance3D
 var _atmo_material: ShaderMaterial
 var _shared_shader: Shader
+var _noise_texture_3d: ImageTexture3D = null
+var _transmittance_lut: Texture2D = null
 var _world_env: WorldEnvironment
 var _sky_material: PanoramaSkyMaterial
 var _camera_attributes: CameraAttributesPractical
@@ -165,13 +249,86 @@ uniform bool cloud_enabled = true;
 uniform bool invert_clouds = false;
 uniform sampler2D cloud_texture : hint_default_black, repeat_enable, filter_linear_mipmap;
 uniform vec3 planet_center = vec3(0.0);
+uniform vec3 camera_pos = vec3(0.0);
 uniform vec3 sun_dir = vec3(0.0, 1.0, 0.0);
 uniform float planet_radius = 600.0;
 uniform float cloud_altitude = 2.0;
 uniform float cloud_thickness = 3.5;
+uniform float cloud_density = 0.8;
 uniform float cloud_coverage = 0.65;
 uniform float cloud_speed = 0.001;
-uniform float cloud_shadow_intensity = 0.75;
+uniform float planet_rotation = 0.0;
+uniform float cloud_noise_speed = 0.0001;
+uniform float cloud_noise_follow = 0.8;
+uniform float cloud_map_density = 0.85;
+uniform float cloud_shadow_intensity = 0.85;
+uniform vec4 cloud_shadow_color : source_color = vec4(0.18, 0.22, 0.32, 1.0);
+uniform float cloud_edge_noise = 0.85;
+uniform float noise_base_scale = 160.0;
+uniform float noise_base_strength = 0.35;
+uniform float noise_detail_scale = 400.0;
+uniform float noise_detail_strength = 0.2;
+uniform bool noise_l1_enabled = true;
+uniform float noise_l1_scale = 160.0;
+uniform float noise_l1_strength = 0.35;
+uniform float noise_l1_edge_only = 0.0;
+uniform int noise_l1_channel = 0;
+uniform bool noise_l2_enabled = true;
+uniform float noise_l2_scale = 400.0;
+uniform float noise_l2_strength = 0.2;
+uniform float noise_l2_edge_only = 0.0;
+uniform int noise_l2_channel = 1;
+uniform bool noise_l3_enabled = false;
+uniform float noise_l3_scale = 800.0;
+uniform float noise_l3_strength = 0.20;
+uniform float noise_l3_edge_only = 0.85;
+uniform int noise_l3_channel = 2;
+uniform bool noise_l4_enabled = false;
+uniform float noise_l4_scale = 1600.0;
+uniform float noise_l4_strength = 0.15;
+uniform float noise_l4_edge_only = 1.0;
+uniform int noise_l4_channel = 3;
+uniform bool noise_l5_enabled = false;
+uniform float noise_l5_scale = 2400.0;
+uniform float noise_l5_strength = 0.15;
+uniform float noise_l5_edge_only = 0.8;
+uniform int noise_l5_channel = 1;
+uniform bool noise_l6_enabled = false;
+uniform float noise_l6_scale = 3200.0;
+uniform float noise_l6_strength = 0.12;
+uniform float noise_l6_edge_only = 1.0;
+uniform int noise_l6_channel = 2;
+uniform bool noise_l7_enabled = false;
+uniform float noise_l7_scale = 4800.0;
+uniform float noise_l7_strength = 0.10;
+uniform float noise_l7_edge_only = 0.5;
+uniform int noise_l7_channel = 0;
+uniform bool noise_l8_enabled = false;
+uniform float noise_l8_scale = 6400.0;
+uniform float noise_l8_strength = 0.08;
+uniform float noise_l8_edge_only = 1.0;
+uniform int noise_l8_channel = 3;
+uniform sampler3D noise_texture_3d : repeat_enable, filter_linear;
+
+float sample_noise_ch_terrain(vec4 s, int ch) {
+    float v = s.r;
+    if (ch == 1) v = s.g;
+    else if (ch == 2) v = s.b;
+    else if (ch == 3) v = s.a;
+    return smoothstep(0.0, 1.0, clamp((v - 0.24) / 0.52, 0.0, 1.0));
+}
+
+float sample_cloud_raw_terrain(vec2 uv, float lod) {
+    vec4 c_tex = textureLod(cloud_texture, vec2(fract(uv.x), clamp(uv.y, 0.001, 0.999)), lod);
+    return (c_tex.a < 0.999) ? c_tex.a : c_tex.r;
+}
+
+uniform float normal_depth = 1.0;
+uniform bool invert_normal_y = false;
+uniform float normal_fade_start = 8.0;
+uniform float normal_fade_end = 200.0;
+uniform float normal_orbital_ratio = 0.22;
+uniform float normal_slope_threshold = 0.08;
 
 varying vec2 v_uv;
 varying float v_is_skirt;
@@ -236,9 +393,6 @@ void fragment() {
     vec3 tex_color  = vec3(0.5);
     vec3 map_normal = vec3(0.5, 0.5, 1.0);
 
-    // Compute continuous screen-space partial derivatives before any conditional branching.
-    // This prevents GPU mipmap derivative divergence at quadrant boundaries (cuv.x=0.5, cuv.y=0.5),
-    // which previously selected the coarsest 1x1 mip level and painted a black line.
     vec2 ddx = dFdx(v_uv * 2.0);
     vec2 ddy = dFdy(v_uv * 2.0);
 
@@ -266,12 +420,11 @@ void fragment() {
         }
     }
 
-    // Dynamic Cloud Shadow on Terrain:
-    if (cloud_enabled) {
+    if (cloud_enabled && cloud_density > 0.005) {
         vec3 sun_norm = -normalize(sun_dir);
         float sun_dot = dot(v_world_normal, sun_norm);
-        if (sun_dot > -0.05) {
-            float r_cloud = planet_radius + cloud_altitude + cloud_thickness * 0.5;
+        if (sun_dot > -0.12) {
+            float r_cloud = planet_radius + cloud_altitude + cloud_thickness * 0.45;
             vec3 d_c = v_world_pos - planet_center;
             float b = dot(d_c, sun_norm);
             float c = dot(d_c, d_c) - r_cloud * r_cloud;
@@ -283,21 +436,104 @@ void fragment() {
                     vec3 n_cloud = normalize(p_cloud - planet_center);
                     float lat_c = asin(clamp(n_cloud.y, -1.0, 1.0));
                     float v_c = 0.5 - lat_c / 3.141592653589793;
-                    float lon_c = atan(n_cloud.x, n_cloud.z);
+                    float lon_c = atan(n_cloud.x, n_cloud.z) - planet_rotation;
                     float u_c = fract(lon_c / (2.0 * 3.141592653589793) + 0.5 + TIME * cloud_speed);
-                    float c_a = textureLod(cloud_texture, vec2(u_c, v_c), 0.0).a;
-                    float cov = invert_clouds ? (1.0 - c_a) : c_a;
-                    float sun_facing = clamp(sun_dot * 5.0, 0.0, 1.0);
-                    float shadow_factor = smoothstep(1.0 - cloud_coverage * 0.9, 1.0, cov) * sun_facing;
-                    tex_color *= mix(vec3(1.0), vec3(0.38, 0.44, 0.55), shadow_factor * (cloud_shadow_intensity * 0.96));
+
+                    // 9-tap soft penumbra blur across cloud_texture at mip 2.4 to remove 4K texel pixelation
+                    vec2 uv_c = vec2(u_c, v_c);
+                    vec2 pen = vec2(0.0014, 0.0028);
+                    float c_raw = sample_cloud_raw_terrain(uv_c, 2.4) * 0.24;
+                    c_raw += sample_cloud_raw_terrain(uv_c + vec2( pen.x, 0.0), 2.4) * 0.12;
+                    c_raw += sample_cloud_raw_terrain(uv_c + vec2(-pen.x, 0.0), 2.4) * 0.12;
+                    c_raw += sample_cloud_raw_terrain(uv_c + vec2(0.0,  pen.y), 2.4) * 0.12;
+                    c_raw += sample_cloud_raw_terrain(uv_c + vec2(0.0, -pen.y), 2.4) * 0.12;
+                    c_raw += sample_cloud_raw_terrain(uv_c + vec2( pen.x,  pen.y) * 0.707, 2.4) * 0.07;
+                    c_raw += sample_cloud_raw_terrain(uv_c + vec2(-pen.x,  pen.y) * 0.707, 2.4) * 0.07;
+                    c_raw += sample_cloud_raw_terrain(uv_c + vec2( pen.x, -pen.y) * 0.707, 2.4) * 0.07;
+                    c_raw += sample_cloud_raw_terrain(uv_c + vec2(-pen.x, -pen.y) * 0.707, 2.4) * 0.07;
+                    float cov = invert_clouds ? (1.0 - c_raw) : c_raw;
+
+                    if (cov > 0.01) {
+                        float rot_noise_angle = -planet_rotation + TIME * (cloud_speed * cloud_noise_follow + cloud_noise_speed) * 6.28318530718;
+                        float cos_nr = cos(rot_noise_angle);
+                        float sin_nr = sin(rot_noise_angle);
+                        vec3 v_c_local = p_cloud - planet_center;
+                        vec3 v_c_rot = vec3(v_c_local.x * cos_nr + v_c_local.z * sin_nr, v_c_local.y, -v_c_local.x * sin_nr + v_c_local.z * cos_nr);
+                        const float NOISE_DOMAIN = 18000.0;
+
+                        float edge_ramp_width = mix(0.22, 0.58, clamp(cloud_edge_noise * 0.5, 0.0, 1.0));
+                        float edge_feather = smoothstep(0.005, edge_ramp_width, cov);
+                        float eff_cov = clamp(cloud_coverage * mix(1.0, cov, cloud_map_density) * edge_feather, 0.0, 1.0);
+                        float base_cloud = eff_cov;
+                        float edge_factor = 1.0 - smoothstep(0.02, 0.65, cov);
+
+                        // Softened 3-tap spatial average on macro noise L1 & L2 only (high-freq L3-L8 diffuse out over altitude drop)
+                        if (noise_l1_enabled && noise_l1_strength > 0.001) {
+                            float s1 = min(noise_l1_scale, 700.0) / NOISE_DOMAIN;
+                            vec3 uvw1 = v_c_rot * s1;
+                            float n_a = sample_noise_ch_terrain(textureLod(noise_texture_3d, uvw1, 0.0), noise_l1_channel);
+                            float n_b = sample_noise_ch_terrain(textureLod(noise_texture_3d, uvw1 + vec3(0.018, 0.0, 0.018), 0.0), noise_l1_channel);
+                            float n_c = sample_noise_ch_terrain(textureLod(noise_texture_3d, uvw1 - vec3(0.018, 0.0, 0.018), 0.0), noise_l1_channel);
+                            float macro1 = (n_a * 0.5 + n_b * 0.25 + n_c * 0.25);
+                            float l1_inf = mix(1.0, edge_factor, clamp(noise_l1_edge_only, 0.0, 1.0));
+                            float erode1 = (1.0 - macro1) * clamp(noise_l1_strength, 0.0, 1.0) * l1_inf * 0.50;
+                            base_cloud = clamp((base_cloud - erode1) / max(0.05, 1.0 - erode1), 0.0, 1.0);
+                        }
+                        if (noise_l2_enabled && noise_l2_strength > 0.001 && base_cloud > 0.001) {
+                            float s2 = min(noise_l2_scale, 900.0) / NOISE_DOMAIN;
+                            vec3 uvw2 = v_c_rot * s2;
+                            float n2_a = sample_noise_ch_terrain(textureLod(noise_texture_3d, uvw2, 0.0), noise_l2_channel);
+                            float n2_b = sample_noise_ch_terrain(textureLod(noise_texture_3d, uvw2 + vec3(0.022, 0.0, -0.022), 0.0), noise_l2_channel);
+                            float meso2 = 0.5 * (n2_a + n2_b);
+                            float l2_inf = mix(1.0, edge_factor, clamp(noise_l2_edge_only, 0.0, 1.0));
+                            float erode2 = (1.0 - meso2) * clamp(noise_l2_strength, 0.0, 1.0) * l2_inf * 0.30;
+                            base_cloud = clamp((base_cloud - erode2) / max(0.05, 1.0 - erode2), 0.0, 1.0);
+                        }
+
+                        // Wide, soft penumbra ramp
+                        float soft_shadow = smoothstep(0.0, 0.72, base_cloud);
+                        float dens_boost = clamp(cloud_density * 3.2, 0.25, 1.0);
+                        float sun_facing = clamp(sun_dot * 4.0 + 0.48, 0.0, 1.0);
+                        float shadow_factor = soft_shadow * dens_boost * sun_facing;
+                        vec3 shadow_tint = cloud_shadow_color.rgb * 0.65;
+                        tex_color *= mix(vec3(1.0), shadow_tint, clamp(shadow_factor * cloud_shadow_intensity, 0.0, 0.92));
+                    }
                 }
             }
         }
     }
 
     ALBEDO = tex_color;
-    NORMAL_MAP = map_normal;
-    NORMAL_MAP_DEPTH = 1.0;
+
+    vec3 cam_pos = (length(camera_pos) > 0.001) ? camera_pos : CAMERA_POSITION_WORLD;
+    float cam_alt = max(0.0, length(cam_pos - planet_center) - planet_radius);
+    float alt_factor = clamp((cam_alt - normal_fade_start) / max(1.0, normal_fade_end - normal_fade_start), 0.0, 1.0);
+    float current_normal_depth = normal_depth * mix(1.0, normal_orbital_ratio, alt_factor);
+
+    vec3 n_map = map_normal;
+    if (invert_normal_y) {
+        n_map.g = 1.0 - n_map.g;
+    }
+
+    if (normal_slope_threshold > 0.001) {
+        vec2 n_xy = (n_map.rg - vec2(0.5)) * 2.0;
+        float micro_slope = length(n_xy);
+
+        vec3 radial_up = normalize(v_world_pos - planet_center);
+        vec3 geom_norm = normalize(cross(dFdx(v_world_pos), dFdy(v_world_pos)));
+        if (dot(geom_norm, radial_up) < 0.0) {
+            geom_norm = -geom_norm;
+        }
+        float geom_slope = 1.0 - clamp(dot(geom_norm, radial_up), 0.0, 1.0);
+
+        float effective_slope = max(micro_slope, geom_slope * 2.5);
+        float slope_factor = smoothstep(normal_slope_threshold * 0.3, normal_slope_threshold * 1.2, effective_slope);
+        current_normal_depth *= slope_factor;
+    }
+
+    NORMAL_MAP = n_map;
+    NORMAL_MAP_DEPTH = current_normal_depth;
+
     ROUGHNESS = 0.85;
     SPECULAR = 0.04;
     METALLIC = 0.0;
@@ -305,53 +541,81 @@ void fragment() {
 """
 
 func _ready() -> void:
+	load_cloud_settings_from_config()
+	if get_viewport():
+		get_viewport().scaling_3d_scale = render_scale
+	_get_or_create_3d_noise_texture()
+	_get_transmittance_lut()
 	_build_planet()
 	_setup_environment_and_adaptation()
 
 func _get_active_camera() -> Camera3D:
 	if Engine.is_editor_hint():
+		if ClassDB.class_exists("EditorInterface"):
+			var ei = Engine.get_singleton("EditorInterface")
+			if not ei and ClassDB.class_exists("EditorInterface"):
+				ei = EditorInterface
+			if ei and ei.has_method("get_editor_viewport_3d"):
+				var evp = ei.get_editor_viewport_3d(0)
+				if evp:
+					var ecam = evp.get_camera_3d()
+					if ecam:
+						return ecam
 		var vp := get_viewport()
 		if vp:
 			var cam := vp.get_camera_3d()
 			if cam:
 				return cam
-		if ClassDB.class_exists("EditorInterface"):
-			var ei := Engine.get_singleton("EditorInterface")
-			if ei and ei.has_method("get_editor_viewport_3d"):
-				var evp = ei.get_editor_viewport_3d(0)
-				if evp:
-					return evp.get_camera_3d()
 		return null
-	if not camera:
+	if not camera and get_viewport():
 		camera = get_viewport().get_camera_3d()
 	return camera
 
 func _process(delta: float) -> void:
-	if sun_light:
+	if not is_inside_tree():
+		return
+
+	if not Engine.is_editor_hint() and planet_spin_enabled and absf(planet_spin_speed) > 0.000001:
+		rotate_y(planet_spin_speed * delta)
+
+	if sun_light and sun_light.is_inside_tree():
 		var dir_to_planet := global_position - sun_light.global_position
 		if dir_to_planet.length_squared() > 0.01:
 			sun_light.look_at(global_position)
 
 	var active_cam := _get_active_camera()
+	var cam_pos_world := Vector3.ZERO
 	if active_cam:
-		_update_lod(active_cam.global_position)
+		if not Engine.is_editor_hint() and active_cam.has_method("sync_with_planet"):
+			active_cam.sync_with_planet()
+		cam_pos_world = active_cam.global_position
+		_update_lod(cam_pos_world)
 		_update_eye_adaptation(delta, active_cam)
 
-	if is_inside_tree() and sun_light and sun_light.is_inside_tree():
-		var s_dir := -sun_light.global_transform.basis.z.normalized()
-		if _atmo_material:
-			_atmo_material.set_shader_parameter("planet_center", global_position)
-			_atmo_material.set_shader_parameter("sun_dir", s_dir)
-		if _ocean_material:
-			_ocean_material.set_shader_parameter("planet_center", global_position)
-			_ocean_material.set_shader_parameter("sun_dir", s_dir)
-		for fid in face_nodes.keys():
-			var mi: MeshInstance3D = face_nodes[fid]
-			if mi and mi.mesh and mi.mesh.get_surface_count() > 0:
-				var mat := mi.mesh.surface_get_material(0) as ShaderMaterial
-				if mat:
-					mat.set_shader_parameter("planet_center", global_position)
-					mat.set_shader_parameter("sun_dir", s_dir)
+	var cur_rot_y := rotation.y
+	var s_dir := -sun_light.global_transform.basis.z.normalized() if (sun_light and sun_light.is_inside_tree()) else Vector3.UP
+
+	if _atmo_material:
+		_atmo_material.set_shader_parameter("planet_center", global_position)
+		_atmo_material.set_shader_parameter("planet_rotation", cur_rot_y)
+		_atmo_material.set_shader_parameter("sun_dir", s_dir)
+		_atmo_material.set_shader_parameter("camera_pos", cam_pos_world)
+
+	if _ocean_material:
+		_ocean_material.set_shader_parameter("planet_center", global_position)
+		_ocean_material.set_shader_parameter("planet_rotation", cur_rot_y)
+		_ocean_material.set_shader_parameter("sun_dir", s_dir)
+		_ocean_material.set_shader_parameter("camera_pos", cam_pos_world)
+
+	for fid in face_nodes.keys():
+		var mi: MeshInstance3D = face_nodes[fid]
+		if mi and mi.mesh and mi.mesh.get_surface_count() > 0:
+			var mat := mi.mesh.surface_get_material(0) as ShaderMaterial
+			if mat:
+				mat.set_shader_parameter("planet_center", global_position)
+				mat.set_shader_parameter("planet_rotation", cur_rot_y)
+				mat.set_shader_parameter("sun_dir", s_dir)
+				mat.set_shader_parameter("camera_pos", cam_pos_world)
 
 const FACE_CONFIGS: Array[Dictionary] = [
 	{"id": "A", "n": Vector3.RIGHT,   "a": Vector3.BACK,    "b": Vector3.UP},
@@ -389,21 +653,39 @@ func _build_planet() -> void:
 		add_child(mi)
 		face_nodes[cfg.id] = mi
 
-		var o_mi := MeshInstance3D.new()
-		o_mi.name = "Ocean_" + cfg.id
-		o_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		o_mi.visible = ocean_enabled
-		add_child(o_mi)
-		ocean_face_nodes[cfg.id] = o_mi
-
 		var q := QuadData.new(cfg.n, cfg.a, cfg.b, 0, Vector2.ZERO, 1.0, cfg.id)
 		root_quads.append(q)
 		_request_face_update(cfg.id, q)
 
+	_build_ocean()
 	_update_shader_params()
 	_build_atmosphere()
 
+func _build_ocean() -> void:
+	if not is_inside_tree():
+		return
+	if is_instance_valid(_ocean_node):
+		_ocean_node.queue_free()
+
+	var sphere := SphereMesh.new()
+	var o_r := radius + ocean_altitude
+	sphere.radius = o_r
+	sphere.height = o_r * 2.0
+	sphere.radial_segments = 256
+	sphere.rings = 128
+
+	_ocean_node = MeshInstance3D.new()
+	_ocean_node.name = "OceanShell"
+	_ocean_node.mesh = sphere
+	_ocean_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_ocean_node.material_override = _ocean_material
+	_ocean_node.visible = ocean_enabled
+	add_child(_ocean_node)
+	_update_ocean_params()
+
 func _update_lod(cam_pos: Vector3) -> void:
+	if not is_inside_tree():
+		return
 	for q in root_quads:
 		if q.update_lod(cam_pos, radius, max_lod, lod_threshold, global_transform):
 			_request_face_update(q.face_id, q)
@@ -446,18 +728,23 @@ func _threaded_gen(face_id: String, root_q: QuadData,
 					+ q.axis_a * (uv.x - 0.5) * 2.0
 					+ q.axis_b * (uv.y - 0.5) * 2.0).normalized()
 				var t := q.axis_a.normalized()
+				var b_vec := q.axis_b.normalized()
 
 				if is_rotated:
 					p = p.rotated(Vector3(0, 0, 1), -PI).rotated(Vector3(0, 1, 0), PI)
 					t = t.rotated(Vector3(0, 0, 1), -PI).rotated(Vector3(0, 1, 0), PI)
+					b_vec = b_vec.rotated(Vector3(0, 0, 1), -PI).rotated(Vector3(0, 1, 0), PI)
 
 				t = (t - p * t.dot(p)).normalized()
+				b_vec = (b_vec - p * b_vec.dot(p)).normalized()
+
+				var tw: float = -1.0 if (p.cross(t)).dot(b_vec) < 0.0 else 1.0
 
 				verts.append(p * snap_radius)
 				uvs.append(uv)
 				uv2s.append(Vector2(0.0, 0.0))
 				norms.append(p)
-				tans.append(t.x); tans.append(t.y); tans.append(t.z); tans.append(1.0)
+				tans.append(t.x); tans.append(t.y); tans.append(t.z); tans.append(tw)
 
 		for y in range(res):
 			for x in range(res):
@@ -518,7 +805,8 @@ func _threaded_gen(face_id: String, root_q: QuadData,
 			for y in range(res):
 				emit_skirt_quad.call(y * (res + 1) + res, (y + 1) * (res + 1) + res)
 
-	call_deferred("_apply_mesh", face_id, verts, uvs, uv2s, norms, tans, indices)
+	if is_instance_valid(self) and is_inside_tree():
+		call_deferred("_apply_mesh", face_id, verts, uvs, uv2s, norms, tans, indices)
 
 func _apply_mesh(fid: String, v: PackedVector3Array, u: PackedVector2Array,
 		u2: PackedVector2Array, n: PackedVector3Array,
@@ -550,12 +838,6 @@ func _apply_mesh(fid: String, v: PackedVector3Array, u: PackedVector2Array,
 	am.surface_set_material(0, mat)
 	mi.mesh = am
 
-	# PQS Ocean: Shares the exact same quadsphere mesh as terrain for perfect LOD and chord synchronization
-	if ocean_face_nodes.has(fid):
-		var o_mi: MeshInstance3D = ocean_face_nodes[fid]
-		o_mi.mesh = am
-		o_mi.material_override = _ocean_material
-
 	_pending_updates.erase(fid)
 
 func _create_face_material(fid: String) -> ShaderMaterial:
@@ -567,13 +849,42 @@ func _create_face_material(fid: String) -> ShaderMaterial:
 
 	mat.set_shader_parameter("cloud_enabled", cloud_enabled)
 	mat.set_shader_parameter("invert_clouds", invert_clouds)
-	mat.set_shader_parameter("planet_center", global_position)
+	if is_inside_tree():
+		mat.set_shader_parameter("planet_center", global_position)
 	mat.set_shader_parameter("planet_radius", radius)
 	mat.set_shader_parameter("cloud_altitude", cloud_altitude)
 	mat.set_shader_parameter("cloud_thickness", cloud_thickness)
+	mat.set_shader_parameter("cloud_density", cloud_density)
 	mat.set_shader_parameter("cloud_coverage", cloud_coverage)
 	mat.set_shader_parameter("cloud_speed", cloud_speed)
+	mat.set_shader_parameter("planet_rotation", rotation.y)
+	mat.set_shader_parameter("cloud_noise_speed", cloud_noise_speed)
+	mat.set_shader_parameter("cloud_noise_follow", cloud_noise_follow)
+	mat.set_shader_parameter("cloud_map_density", cloud_map_density)
 	mat.set_shader_parameter("cloud_shadow_intensity", cloud_shadow_intensity)
+	mat.set_shader_parameter("cloud_shadow_color", cloud_shadow_color)
+	mat.set_shader_parameter("cloud_edge_noise", cloud_edge_noise)
+	mat.set_shader_parameter("noise_base_scale", noise_base_scale)
+	mat.set_shader_parameter("noise_base_strength", noise_base_strength)
+	mat.set_shader_parameter("noise_detail_scale", noise_detail_scale)
+	mat.set_shader_parameter("noise_detail_strength", noise_detail_strength)
+	mat.set_shader_parameter("noise_l1_enabled", noise_l1_enabled)
+	mat.set_shader_parameter("noise_l1_scale", noise_l1_scale)
+	mat.set_shader_parameter("noise_l1_strength", noise_l1_strength)
+	mat.set_shader_parameter("noise_l1_edge_only", noise_l1_edge_only)
+	mat.set_shader_parameter("noise_l1_channel", noise_l1_channel)
+	mat.set_shader_parameter("noise_l2_enabled", noise_l2_enabled)
+	mat.set_shader_parameter("noise_l2_scale", noise_l2_scale)
+	mat.set_shader_parameter("noise_l2_strength", noise_l2_strength)
+	mat.set_shader_parameter("noise_l2_edge_only", noise_l2_edge_only)
+	mat.set_shader_parameter("noise_l2_channel", noise_l2_channel)
+	mat.set_shader_parameter("normal_depth", normal_depth)
+	mat.set_shader_parameter("invert_normal_y", invert_normal_y)
+	mat.set_shader_parameter("normal_orbital_ratio", normal_orbital_ratio)
+	mat.set_shader_parameter("normal_slope_threshold", normal_slope_threshold)
+	var n3d := _get_or_create_3d_noise_texture()
+	if n3d:
+		mat.set_shader_parameter("noise_texture_3d", n3d)
 	if cloud_texture:
 		mat.set_shader_parameter("cloud_texture", cloud_texture)
 	elif ResourceLoader.exists("res://assets/planets/earth/clouds_4k.png"):
@@ -615,7 +926,6 @@ func _collect_leaves(q: QuadData, list: Array[QuadData]) -> void:
 			_collect_leaves(c, list)
 
 func _preload_textures() -> void:
-	# Synchronize inspector face arrays with internal dictionaries
 	var face_arr_map := {
 		"A": [face_a_color, face_a_height, face_a_normal, face_a_water],
 		"B": [face_b_color, face_b_height, face_b_normal, face_b_water],
@@ -632,7 +942,6 @@ func _preload_textures() -> void:
 		var n_arr: Array[Texture2D] = arrs[2]
 		var w_arr: Array[Texture2D] = arrs[3]
 
-		# If empty, populate from directories by default
 		if c_arr.is_empty() or h_arr.is_empty() or n_arr.is_empty() or w_arr.is_empty():
 			for i in range(1, 5):
 				var suffix := f + str(i) + out_format
@@ -655,12 +964,10 @@ func _preload_textures() -> void:
 		_normal_textures[f] = n_arr
 		_water_textures[f] = w_arr
 
-	# Initialize cloud texture default if not yet set
 	if not cloud_texture:
 		if ResourceLoader.exists("res://assets/planets/earth/clouds_4k.png"):
 			cloud_texture = load("res://assets/planets/earth/clouds_4k.png")
 
-	# Initialize water mask texture default if not yet set
 	if not ocean_water_mask:
 		if ResourceLoader.exists("res://assets/earth_landocean_16K.png"):
 			ocean_water_mask = load("res://assets/earth_landocean_16K.png")
@@ -730,24 +1037,98 @@ func _update_ocean_params() -> void:
 	_ocean_material.set_shader_parameter("shallow_color", ocean_shallow_color)
 	_ocean_material.set_shader_parameter("deep_color", ocean_deep_color)
 	_ocean_material.set_shader_parameter("depth_distance", ocean_depth_distance)
-	_ocean_material.set_shader_parameter("planet_center", global_position)
+	_ocean_material.set_shader_parameter("wave_amplitude", wave_amplitude)
+	_ocean_material.set_shader_parameter("wave_frequency", wave_frequency)
+	_ocean_material.set_shader_parameter("wave_speed", wave_speed)
+	_ocean_material.set_shader_parameter("wave_steepness", wave_steepness)
+	_ocean_material.set_shader_parameter("shore_foam_distance", shore_foam_distance)
+	_ocean_material.set_shader_parameter("crest_foam_threshold", crest_foam_threshold)
+	_ocean_material.set_shader_parameter("foam_intensity", foam_intensity)
+	_ocean_material.set_shader_parameter("ssr_enabled", ssr_enabled)
+	if is_inside_tree():
+		_ocean_material.set_shader_parameter("planet_center", global_position)
+		if sun_light and sun_light.is_inside_tree():
+			_ocean_material.set_shader_parameter("sun_dir", -sun_light.global_transform.basis.z.normalized())
+		else:
+			_ocean_material.set_shader_parameter("sun_dir", Vector3.UP)
 	_ocean_material.set_shader_parameter("planet_radius", radius)
-	if is_inside_tree() and sun_light and sun_light.is_inside_tree():
-		_ocean_material.set_shader_parameter("sun_dir", -sun_light.global_transform.basis.z.normalized())
 	if ocean_water_mask:
 		_ocean_material.set_shader_parameter("water_mask", ocean_water_mask)
 	elif ResourceLoader.exists("res://assets/earth_landocean_16K.png"):
 		ocean_water_mask = load("res://assets/earth_landocean_16K.png")
 		_ocean_material.set_shader_parameter("water_mask", ocean_water_mask)
 
-	# Cloud shadow projection on ocean
 	_ocean_material.set_shader_parameter("cloud_enabled", cloud_enabled)
 	_ocean_material.set_shader_parameter("invert_clouds", invert_clouds)
 	_ocean_material.set_shader_parameter("cloud_altitude", cloud_altitude)
 	_ocean_material.set_shader_parameter("cloud_thickness", cloud_thickness)
+	_ocean_material.set_shader_parameter("cloud_density", cloud_density)
 	_ocean_material.set_shader_parameter("cloud_coverage", cloud_coverage)
 	_ocean_material.set_shader_parameter("cloud_speed", cloud_speed)
+	_ocean_material.set_shader_parameter("planet_rotation", rotation.y)
+	_ocean_material.set_shader_parameter("cloud_noise_speed", cloud_noise_speed)
+	_ocean_material.set_shader_parameter("cloud_noise_follow", cloud_noise_follow)
+	_ocean_material.set_shader_parameter("cloud_map_density", cloud_map_density)
 	_ocean_material.set_shader_parameter("cloud_shadow_intensity", cloud_shadow_intensity)
+	_ocean_material.set_shader_parameter("cloud_shadow_color", cloud_shadow_color)
+	_ocean_material.set_shader_parameter("cloud_edge_noise", cloud_edge_noise)
+	_ocean_material.set_shader_parameter("noise_base_scale", noise_base_scale)
+	_ocean_material.set_shader_parameter("noise_base_strength", noise_base_strength)
+	_ocean_material.set_shader_parameter("noise_detail_scale", noise_detail_scale)
+	_ocean_material.set_shader_parameter("noise_detail_strength", noise_detail_strength)
+
+	_ocean_material.set_shader_parameter("noise_l1_enabled", noise_l1_enabled)
+	_ocean_material.set_shader_parameter("noise_l1_scale", noise_l1_scale)
+	_ocean_material.set_shader_parameter("noise_l1_strength", noise_l1_strength)
+	_ocean_material.set_shader_parameter("noise_l1_edge_only", noise_l1_edge_only)
+	_ocean_material.set_shader_parameter("noise_l1_channel", noise_l1_channel)
+
+	_ocean_material.set_shader_parameter("noise_l2_enabled", noise_l2_enabled)
+	_ocean_material.set_shader_parameter("noise_l2_scale", noise_l2_scale)
+	_ocean_material.set_shader_parameter("noise_l2_strength", noise_l2_strength)
+	_ocean_material.set_shader_parameter("noise_l2_edge_only", noise_l2_edge_only)
+	_ocean_material.set_shader_parameter("noise_l2_channel", noise_l2_channel)
+
+	_ocean_material.set_shader_parameter("noise_l3_enabled", noise_l3_enabled)
+	_ocean_material.set_shader_parameter("noise_l3_scale", noise_l3_scale)
+	_ocean_material.set_shader_parameter("noise_l3_strength", noise_l3_strength)
+	_ocean_material.set_shader_parameter("noise_l3_edge_only", noise_l3_edge_only)
+	_ocean_material.set_shader_parameter("noise_l3_channel", noise_l3_channel)
+
+	_ocean_material.set_shader_parameter("noise_l4_enabled", noise_l4_enabled)
+	_ocean_material.set_shader_parameter("noise_l4_scale", noise_l4_scale)
+	_ocean_material.set_shader_parameter("noise_l4_strength", noise_l4_strength)
+	_ocean_material.set_shader_parameter("noise_l4_edge_only", noise_l4_edge_only)
+	_ocean_material.set_shader_parameter("noise_l4_channel", noise_l4_channel)
+
+	_ocean_material.set_shader_parameter("noise_l5_enabled", noise_l5_enabled)
+	_ocean_material.set_shader_parameter("noise_l5_scale", noise_l5_scale)
+	_ocean_material.set_shader_parameter("noise_l5_strength", noise_l5_strength)
+	_ocean_material.set_shader_parameter("noise_l5_edge_only", noise_l5_edge_only)
+	_ocean_material.set_shader_parameter("noise_l5_channel", noise_l5_channel)
+
+	_ocean_material.set_shader_parameter("noise_l6_enabled", noise_l6_enabled)
+	_ocean_material.set_shader_parameter("noise_l6_scale", noise_l6_scale)
+	_ocean_material.set_shader_parameter("noise_l6_strength", noise_l6_strength)
+	_ocean_material.set_shader_parameter("noise_l6_edge_only", noise_l6_edge_only)
+	_ocean_material.set_shader_parameter("noise_l6_channel", noise_l6_channel)
+
+	_ocean_material.set_shader_parameter("noise_l7_enabled", noise_l7_enabled)
+	_ocean_material.set_shader_parameter("noise_l7_scale", noise_l7_scale)
+	_ocean_material.set_shader_parameter("noise_l7_strength", noise_l7_strength)
+	_ocean_material.set_shader_parameter("noise_l7_edge_only", noise_l7_edge_only)
+	_ocean_material.set_shader_parameter("noise_l7_channel", noise_l7_channel)
+
+	_ocean_material.set_shader_parameter("noise_l8_enabled", noise_l8_enabled)
+	_ocean_material.set_shader_parameter("noise_l8_scale", noise_l8_scale)
+	_ocean_material.set_shader_parameter("noise_l8_strength", noise_l8_strength)
+	_ocean_material.set_shader_parameter("noise_l8_edge_only", noise_l8_edge_only)
+	_ocean_material.set_shader_parameter("noise_l8_channel", noise_l8_channel)
+
+
+	var n3d := _get_or_create_3d_noise_texture()
+	if n3d:
+		_ocean_material.set_shader_parameter("noise_texture_3d", n3d)
 	if cloud_texture:
 		_ocean_material.set_shader_parameter("cloud_texture", cloud_texture)
 	elif ResourceLoader.exists("res://assets/planets/earth/clouds_4k.png"):
@@ -756,6 +1137,8 @@ func _update_ocean_params() -> void:
 
 func _set_ocean_enabled(v: bool) -> void:
 	ocean_enabled = v
+	if is_instance_valid(_ocean_node):
+		_ocean_node.visible = v
 	for o_mi: MeshInstance3D in ocean_face_nodes.values():
 		o_mi.visible = v
 
@@ -765,6 +1148,12 @@ func _set_ocean_water_mask(v: Texture2D) -> void:
 
 func _set_ocean_altitude(v: float) -> void:
 	ocean_altitude = v
+	if is_instance_valid(_ocean_node) and _ocean_node.mesh:
+		var s := _ocean_node.mesh as SphereMesh
+		if s:
+			var o_r := radius + v
+			s.radius = o_r
+			s.height = o_r * 2.0
 	_update_ocean_params()
 
 func _set_ocean_shallow(v: Color) -> void:
@@ -777,6 +1166,38 @@ func _set_ocean_deep(v: Color) -> void:
 
 func _set_ocean_depth_distance(v: float) -> void:
 	ocean_depth_distance = v
+	_update_ocean_params()
+
+func _set_wave_amplitude(v: float) -> void:
+	wave_amplitude = v
+	_update_ocean_params()
+
+func _set_wave_frequency(v: float) -> void:
+	wave_frequency = v
+	_update_ocean_params()
+
+func _set_wave_speed(v: float) -> void:
+	wave_speed = v
+	_update_ocean_params()
+
+func _set_wave_steepness(v: float) -> void:
+	wave_steepness = v
+	_update_ocean_params()
+
+func _set_shore_foam_distance(v: float) -> void:
+	shore_foam_distance = v
+	_update_ocean_params()
+
+func _set_crest_foam_threshold(v: float) -> void:
+	crest_foam_threshold = v
+	_update_ocean_params()
+
+func _set_foam_intensity(v: float) -> void:
+	foam_intensity = v
+	_update_ocean_params()
+
+func _set_ssr_enabled(v: bool) -> void:
+	ssr_enabled = v
 	_update_ocean_params()
 
 func _set_ocean_bed_sink(v: float) -> void:
@@ -796,6 +1217,12 @@ func _set_lod(v: int) -> void:
 	max_lod = v
 	if Engine.is_editor_hint():
 		_build_planet()
+
+func _set_planet_spin_enabled(v: bool) -> void:
+	planet_spin_enabled = v
+
+func _set_planet_spin_speed(v: float) -> void:
+	planet_spin_speed = v
 
 func _set_hscale(v: float) -> void:
 	height_scale = v
@@ -856,14 +1283,73 @@ func _update_shader_params() -> void:
 				mat.set_shader_parameter("ocean_bed_sink", ocean_bed_sink)
 				mat.set_shader_parameter("cloud_enabled", cloud_enabled)
 				mat.set_shader_parameter("invert_clouds", invert_clouds)
-				mat.set_shader_parameter("planet_center", global_position)
+				if is_inside_tree():
+					mat.set_shader_parameter("planet_center", global_position)
 				mat.set_shader_parameter("sun_dir", s_dir)
 				mat.set_shader_parameter("planet_radius", radius)
 				mat.set_shader_parameter("cloud_altitude", cloud_altitude)
 				mat.set_shader_parameter("cloud_thickness", cloud_thickness)
+				mat.set_shader_parameter("cloud_density", cloud_density)
 				mat.set_shader_parameter("cloud_coverage", cloud_coverage)
 				mat.set_shader_parameter("cloud_speed", cloud_speed)
+				mat.set_shader_parameter("planet_rotation", rotation.y)
+				mat.set_shader_parameter("cloud_noise_speed", cloud_noise_speed)
+				mat.set_shader_parameter("cloud_noise_follow", cloud_noise_follow)
+				mat.set_shader_parameter("cloud_map_density", cloud_map_density)
 				mat.set_shader_parameter("cloud_shadow_intensity", cloud_shadow_intensity)
+				mat.set_shader_parameter("cloud_shadow_color", cloud_shadow_color)
+				mat.set_shader_parameter("cloud_edge_noise", cloud_edge_noise)
+				mat.set_shader_parameter("noise_base_scale", noise_base_scale)
+				mat.set_shader_parameter("noise_base_strength", noise_base_strength)
+				mat.set_shader_parameter("noise_detail_scale", noise_detail_scale)
+				mat.set_shader_parameter("noise_detail_strength", noise_detail_strength)
+				mat.set_shader_parameter("noise_l1_enabled", noise_l1_enabled)
+				mat.set_shader_parameter("noise_l1_scale", noise_l1_scale)
+				mat.set_shader_parameter("noise_l1_strength", noise_l1_strength)
+				mat.set_shader_parameter("noise_l1_edge_only", noise_l1_edge_only)
+				mat.set_shader_parameter("noise_l1_channel", noise_l1_channel)
+				mat.set_shader_parameter("noise_l2_enabled", noise_l2_enabled)
+				mat.set_shader_parameter("noise_l2_scale", noise_l2_scale)
+				mat.set_shader_parameter("noise_l2_strength", noise_l2_strength)
+				mat.set_shader_parameter("noise_l2_edge_only", noise_l2_edge_only)
+				mat.set_shader_parameter("noise_l2_channel", noise_l2_channel)
+				mat.set_shader_parameter("noise_l3_enabled", noise_l3_enabled)
+				mat.set_shader_parameter("noise_l3_scale", noise_l3_scale)
+				mat.set_shader_parameter("noise_l3_strength", noise_l3_strength)
+				mat.set_shader_parameter("noise_l3_edge_only", noise_l3_edge_only)
+				mat.set_shader_parameter("noise_l3_channel", noise_l3_channel)
+				mat.set_shader_parameter("noise_l4_enabled", noise_l4_enabled)
+				mat.set_shader_parameter("noise_l4_scale", noise_l4_scale)
+				mat.set_shader_parameter("noise_l4_strength", noise_l4_strength)
+				mat.set_shader_parameter("noise_l4_edge_only", noise_l4_edge_only)
+				mat.set_shader_parameter("noise_l4_channel", noise_l4_channel)
+				mat.set_shader_parameter("noise_l5_enabled", noise_l5_enabled)
+				mat.set_shader_parameter("noise_l5_scale", noise_l5_scale)
+				mat.set_shader_parameter("noise_l5_strength", noise_l5_strength)
+				mat.set_shader_parameter("noise_l5_edge_only", noise_l5_edge_only)
+				mat.set_shader_parameter("noise_l5_channel", noise_l5_channel)
+				mat.set_shader_parameter("noise_l6_enabled", noise_l6_enabled)
+				mat.set_shader_parameter("noise_l6_scale", noise_l6_scale)
+				mat.set_shader_parameter("noise_l6_strength", noise_l6_strength)
+				mat.set_shader_parameter("noise_l6_edge_only", noise_l6_edge_only)
+				mat.set_shader_parameter("noise_l6_channel", noise_l6_channel)
+				mat.set_shader_parameter("noise_l7_enabled", noise_l7_enabled)
+				mat.set_shader_parameter("noise_l7_scale", noise_l7_scale)
+				mat.set_shader_parameter("noise_l7_strength", noise_l7_strength)
+				mat.set_shader_parameter("noise_l7_edge_only", noise_l7_edge_only)
+				mat.set_shader_parameter("noise_l7_channel", noise_l7_channel)
+				mat.set_shader_parameter("noise_l8_enabled", noise_l8_enabled)
+				mat.set_shader_parameter("noise_l8_scale", noise_l8_scale)
+				mat.set_shader_parameter("noise_l8_strength", noise_l8_strength)
+				mat.set_shader_parameter("noise_l8_edge_only", noise_l8_edge_only)
+				mat.set_shader_parameter("noise_l8_channel", noise_l8_channel)
+				mat.set_shader_parameter("normal_depth", normal_depth)
+				mat.set_shader_parameter("invert_normal_y", invert_normal_y)
+				mat.set_shader_parameter("normal_orbital_ratio", normal_orbital_ratio)
+				mat.set_shader_parameter("normal_slope_threshold", normal_slope_threshold)
+				var n3d := _get_or_create_3d_noise_texture()
+				if n3d:
+					mat.set_shader_parameter("noise_texture_3d", n3d)
 				if cloud_texture:
 					mat.set_shader_parameter("cloud_texture", cloud_texture)
 				elif ResourceLoader.exists("res://assets/planets/earth/clouds_4k.png"):
@@ -940,9 +1426,53 @@ func _set_cloud_speed(v: float) -> void:
 	cloud_speed = v
 	_update_cloud_params()
 
+func _set_cloud_noise_speed(v: float) -> void:
+	cloud_noise_speed = v
+	_update_cloud_params()
+
+func _set_cloud_noise_follow(v: float) -> void:
+	cloud_noise_follow = v
+	_update_cloud_params()
+
 func _set_cloud_shadow_intensity(v: float) -> void:
 	cloud_shadow_intensity = v
 	_update_cloud_params()
+
+func _set_cloud_edge_noise(v: float) -> void:
+	cloud_edge_noise = clampf(v, 0.0, 2.0)
+	_update_cloud_params()
+
+func _set_cloud_noise_amount(v: float) -> void:
+	cloud_noise_amount = clampf(v, 0.0, 2.0)
+	_update_cloud_params()
+
+func _set_cloud_self_shadow_intensity(v: float) -> void:
+	cloud_self_shadow_intensity = clampf(v, 0.0, 2.0)
+	_update_atmosphere_params()
+
+func _set_cloud_terminator_depth(v: float) -> void:
+	cloud_terminator_depth = clampf(v, 0.0, 2.0)
+	_update_atmosphere_params()
+
+func _set_cloud_terminator_softness(v: float) -> void:
+	cloud_terminator_softness = clampf(v, 0.02, 0.5)
+	_update_atmosphere_params()
+
+func _set_cloud_sunset_tint(v: float) -> void:
+	cloud_sunset_tint = clampf(v, 0.0, 1.0)
+	_update_atmosphere_params()
+
+func _set_cloud_terminator_offset(v: float) -> void:
+	cloud_terminator_offset = clampf(v, -0.4, 0.4)
+	_update_atmosphere_params()
+
+func _set_cloud_opacity(v: float) -> void:
+	cloud_opacity = clampf(v, 0.2, 5.0)
+	_update_atmosphere_params()
+
+func _set_cloud_dither(v: float) -> void:
+	cloud_dither = clampf(v, 0.0, 1.0)
+	_update_atmosphere_params()
 
 func _set_cloud_day_brightness(v: float) -> void:
 	cloud_day_brightness = v
@@ -954,11 +1484,11 @@ func _set_cloud_night_brightness(v: float) -> void:
 
 func _set_cloud_map_height(v: float) -> void:
 	cloud_map_height = v
-	_update_atmosphere_params()
+	_update_cloud_params()
 
 func _set_cloud_map_density(v: float) -> void:
 	cloud_map_density = v
-	_update_atmosphere_params()
+	_update_cloud_params()
 
 func _set_cloud_color(v: Color) -> void:
 	cloud_color = v
@@ -966,23 +1496,174 @@ func _set_cloud_color(v: Color) -> void:
 
 func _set_cloud_shadow_color(v: Color) -> void:
 	cloud_shadow_color = v
-	_update_atmosphere_params()
+	_update_cloud_params()
+
+var _in_noise_sync: bool = false
 
 func _set_noise_base_scale(v: float) -> void:
 	noise_base_scale = v
-	_update_atmosphere_params()
+	if not _in_noise_sync:
+		_in_noise_sync = true
+		_set_noise_l1_scale(v)
+		_in_noise_sync = false
+	_update_cloud_params()
 
 func _set_noise_base_strength(v: float) -> void:
 	noise_base_strength = v
-	_update_atmosphere_params()
+	if not _in_noise_sync:
+		_in_noise_sync = true
+		_set_noise_l1_strength(v)
+		_in_noise_sync = false
+	_update_cloud_params()
 
 func _set_noise_detail_scale(v: float) -> void:
 	noise_detail_scale = v
-	_update_atmosphere_params()
+	if not _in_noise_sync:
+		_in_noise_sync = true
+		_set_noise_l2_scale(v)
+		_in_noise_sync = false
+	_update_cloud_params()
 
 func _set_noise_detail_strength(v: float) -> void:
 	noise_detail_strength = v
+	if not _in_noise_sync:
+		_in_noise_sync = true
+		_set_noise_l2_strength(v)
+		_in_noise_sync = false
+	_update_cloud_params()
+
+func _set_noise_l1_enabled(v: bool) -> void: noise_l1_enabled = v; _update_cloud_params()
+func _set_noise_l1_scale(v: float) -> void:
+	noise_l1_scale = v
+	if not _in_noise_sync:
+		_in_noise_sync = true
+		_set_noise_base_scale(v)
+		_in_noise_sync = false
+	_update_cloud_params()
+
+func _set_noise_l1_strength(v: float) -> void:
+	noise_l1_strength = v
+	if not _in_noise_sync:
+		_in_noise_sync = true
+		_set_noise_base_strength(v)
+		_in_noise_sync = false
+	_update_cloud_params()
+
+func _set_noise_l1_edge_only(v: float) -> void: noise_l1_edge_only = clampf(v, 0.0, 1.0); _update_cloud_params()
+func _set_noise_l1_channel(v: int) -> void: noise_l1_channel = clampi(v, 0, 3); _update_cloud_params()
+
+func _set_noise_l2_enabled(v: bool) -> void: noise_l2_enabled = v; _update_cloud_params()
+func _set_noise_l2_scale(v: float) -> void:
+	noise_l2_scale = v
+	if not _in_noise_sync:
+		_in_noise_sync = true
+		_set_noise_detail_scale(v)
+		_in_noise_sync = false
+	_update_cloud_params()
+
+func _set_noise_l2_strength(v: float) -> void:
+	noise_l2_strength = v
+	if not _in_noise_sync:
+		_in_noise_sync = true
+		_set_noise_detail_strength(v)
+		_in_noise_sync = false
+	_update_cloud_params()
+
+func _set_noise_l2_edge_only(v: float) -> void: noise_l2_edge_only = clampf(v, 0.0, 1.0); _update_cloud_params()
+func _set_noise_l2_channel(v: int) -> void: noise_l2_channel = clampi(v, 0, 3); _update_cloud_params()
+
+func _set_noise_l3_enabled(v: bool) -> void: noise_l3_enabled = v; _update_cloud_params()
+func _set_noise_l3_scale(v: float) -> void: noise_l3_scale = v; _update_cloud_params()
+func _set_noise_l3_strength(v: float) -> void: noise_l3_strength = v; _update_cloud_params()
+func _set_noise_l3_edge_only(v: float) -> void: noise_l3_edge_only = clampf(v, 0.0, 1.0); _update_cloud_params()
+func _set_noise_l3_channel(v: int) -> void: noise_l3_channel = clampi(v, 0, 3); _update_cloud_params()
+
+func _set_noise_l4_enabled(v: bool) -> void: noise_l4_enabled = v; _update_cloud_params()
+func _set_noise_l4_scale(v: float) -> void: noise_l4_scale = v; _update_cloud_params()
+func _set_noise_l4_strength(v: float) -> void: noise_l4_strength = v; _update_cloud_params()
+func _set_noise_l4_edge_only(v: float) -> void: noise_l4_edge_only = clampf(v, 0.0, 1.0); _update_cloud_params()
+func _set_noise_l4_channel(v: int) -> void: noise_l4_channel = clampi(v, 0, 3); _update_cloud_params()
+
+func _set_noise_l5_enabled(v: bool) -> void: noise_l5_enabled = v; _update_cloud_params()
+func _set_noise_l5_scale(v: float) -> void: noise_l5_scale = v; _update_cloud_params()
+func _set_noise_l5_strength(v: float) -> void: noise_l5_strength = v; _update_cloud_params()
+func _set_noise_l5_edge_only(v: float) -> void: noise_l5_edge_only = clampf(v, 0.0, 1.0); _update_cloud_params()
+func _set_noise_l5_channel(v: int) -> void: noise_l5_channel = clampi(v, 0, 3); _update_cloud_params()
+
+func _set_noise_l6_enabled(v: bool) -> void: noise_l6_enabled = v; _update_cloud_params()
+func _set_noise_l6_scale(v: float) -> void: noise_l6_scale = v; _update_cloud_params()
+func _set_noise_l6_strength(v: float) -> void: noise_l6_strength = v; _update_cloud_params()
+func _set_noise_l6_edge_only(v: float) -> void: noise_l6_edge_only = clampf(v, 0.0, 1.0); _update_cloud_params()
+func _set_noise_l6_channel(v: int) -> void: noise_l6_channel = clampi(v, 0, 3); _update_cloud_params()
+
+func _set_noise_l7_enabled(v: bool) -> void: noise_l7_enabled = v; _update_cloud_params()
+func _set_noise_l7_scale(v: float) -> void: noise_l7_scale = v; _update_cloud_params()
+func _set_noise_l7_strength(v: float) -> void: noise_l7_strength = v; _update_cloud_params()
+func _set_noise_l7_edge_only(v: float) -> void: noise_l7_edge_only = clampf(v, 0.0, 1.0); _update_cloud_params()
+func _set_noise_l7_channel(v: int) -> void: noise_l7_channel = clampi(v, 0, 3); _update_cloud_params()
+
+func _set_noise_l8_enabled(v: bool) -> void: noise_l8_enabled = v; _update_cloud_params()
+func _set_noise_l8_scale(v: float) -> void: noise_l8_scale = v; _update_cloud_params()
+func _set_noise_l8_strength(v: float) -> void: noise_l8_strength = v; _update_cloud_params()
+func _set_noise_l8_edge_only(v: float) -> void: noise_l8_edge_only = clampf(v, 0.0, 1.0); _update_cloud_params()
+func _set_noise_l8_channel(v: int) -> void: noise_l8_channel = clampi(v, 0, 3); _update_cloud_params()
+
+
+func _set_cloud_samples(v: int) -> void:
+	cloud_samples = clampi(v, 4, 64)
 	_update_atmosphere_params()
+
+func _set_render_scale(v: float) -> void:
+	render_scale = clampf(v, 0.25, 1.0)
+	if is_inside_tree() and get_viewport():
+		get_viewport().scaling_3d_scale = render_scale
+
+func _set_normal_depth(v: float) -> void:
+	normal_depth = clampf(v, 0.0, 2.0)
+	_update_shader_params()
+
+func _set_invert_normal_y(v: bool) -> void:
+	invert_normal_y = v
+	_update_shader_params()
+
+func _set_normal_orbital_ratio(v: float) -> void:
+	normal_orbital_ratio = clampf(v, -2.0, 2.0)
+	_update_shader_params()
+
+func _set_normal_slope_threshold(v: float) -> void:
+	normal_slope_threshold = clampf(v, 0.0, 1.0)
+	_update_shader_params()
+
+func _get_or_create_3d_noise_texture() -> ImageTexture3D:
+	if _noise_texture_3d != null:
+		return _noise_texture_3d
+	var path := "res://assets/cloud_noise_3d.bin"
+	if FileAccess.file_exists(path):
+		var bytes := FileAccess.get_file_as_bytes(path)
+		var size := 64
+		var images: Array[Image] = []
+		var slice_size := size * size * 4
+		for z in range(size):
+			var slice_data := bytes.slice(z * slice_size, (z + 1) * slice_size)
+			var img := Image.create_from_data(size, size, false, Image.FORMAT_RGBA8, slice_data)
+			images.append(img)
+		_noise_texture_3d = ImageTexture3D.new()
+		var err := _noise_texture_3d.create(Image.FORMAT_RGBA8, size, size, size, false, images)
+		if err != OK:
+			push_warning("Failed to create ImageTexture3D: %s" % err)
+	return _noise_texture_3d
+
+func _get_transmittance_lut() -> Texture2D:
+	if _transmittance_lut != null:
+		return _transmittance_lut
+	var path := "res://assets/transmittance_lut.png"
+	if ResourceLoader.exists(path):
+		_transmittance_lut = load(path)
+	elif FileAccess.file_exists(path):
+		var img := Image.load_from_file(path)
+		if img:
+			_transmittance_lut = ImageTexture.create_from_image(img)
+	return _transmittance_lut
 
 # Atmosphere methods
 func _build_atmosphere() -> void:
@@ -1024,48 +1705,119 @@ func _update_atmosphere_params() -> void:
 	if not _atmo_material:
 		return
 	if is_inside_tree():
-		_atmo_material.set_shader_parameter("planet_center",  global_position)
+		_atmo_material.set_shader_parameter("planet_center", global_position)
 		if sun_light and sun_light.is_inside_tree():
 			_atmo_material.set_shader_parameter(
 				"sun_dir", -sun_light.global_transform.basis.z.normalized()
 			)
-	_atmo_material.set_shader_parameter("planet_radius",  radius)
-	_atmo_material.set_shader_parameter("atmo_radius",    radius * atmosphere_scale)
+		else:
+			_atmo_material.set_shader_parameter("sun_dir", Vector3.UP)
+	_atmo_material.set_shader_parameter("planet_radius", radius)
+	_atmo_material.set_shader_parameter("atmo_radius", radius * atmosphere_scale)
 
-	# Atmospheric scattering parameters
 	if atmosphere_enabled:
 		_atmo_material.set_shader_parameter("rayleigh_coeff", rayleigh_coeff)
 		_atmo_material.set_shader_parameter("scale_height_r", radius * scale_height_rayleigh)
-		_atmo_material.set_shader_parameter("mie_coeff",      mie_coeff)
-		_atmo_material.set_shader_parameter("mie_g",          mie_g)
+		_atmo_material.set_shader_parameter("mie_coeff", mie_coeff)
+		_atmo_material.set_shader_parameter("mie_g", mie_g)
 		_atmo_material.set_shader_parameter("scale_height_m", radius * scale_height_mie)
 	else:
 		_atmo_material.set_shader_parameter("rayleigh_coeff", Vector3.ZERO)
 		_atmo_material.set_shader_parameter("scale_height_r", radius * scale_height_rayleigh)
-		_atmo_material.set_shader_parameter("mie_coeff",      0.0)
-		_atmo_material.set_shader_parameter("mie_g",          mie_g)
+		_atmo_material.set_shader_parameter("mie_coeff", 0.0)
+		_atmo_material.set_shader_parameter("mie_g", mie_g)
 		_atmo_material.set_shader_parameter("scale_height_m", radius * scale_height_mie)
 
-	_atmo_material.set_shader_parameter("sun_intensity",  sun_intensity)
+	_atmo_material.set_shader_parameter("sun_intensity", sun_intensity)
 
-	# Unified Cloud Parameters
-	_atmo_material.set_shader_parameter("cloud_enabled",      cloud_enabled)
-	_atmo_material.set_shader_parameter("invert_clouds",      invert_clouds)
-	_atmo_material.set_shader_parameter("cloud_altitude",    cloud_altitude)
-	_atmo_material.set_shader_parameter("cloud_thickness",   cloud_thickness)
-	_atmo_material.set_shader_parameter("cloud_density",     cloud_density)
-	_atmo_material.set_shader_parameter("cloud_coverage",    cloud_coverage)
-	_atmo_material.set_shader_parameter("cloud_speed",            cloud_speed)
-	_atmo_material.set_shader_parameter("cloud_day_brightness",   cloud_day_brightness)
+	_atmo_material.set_shader_parameter("cloud_enabled", cloud_enabled)
+	_atmo_material.set_shader_parameter("invert_clouds", invert_clouds)
+	_atmo_material.set_shader_parameter("cloud_altitude", cloud_altitude)
+	_atmo_material.set_shader_parameter("cloud_thickness", cloud_thickness)
+	_atmo_material.set_shader_parameter("cloud_density", cloud_density)
+	_atmo_material.set_shader_parameter("cloud_coverage", cloud_coverage)
+	_atmo_material.set_shader_parameter("cloud_speed", cloud_speed)
+	_atmo_material.set_shader_parameter("planet_rotation", rotation.y)
+	_atmo_material.set_shader_parameter("cloud_noise_speed", cloud_noise_speed)
+	_atmo_material.set_shader_parameter("cloud_noise_follow", cloud_noise_follow)
+	_atmo_material.set_shader_parameter("cloud_day_brightness", cloud_day_brightness)
 	_atmo_material.set_shader_parameter("cloud_night_brightness", cloud_night_brightness)
-	_atmo_material.set_shader_parameter("cloud_map_height",       cloud_map_height)
-	_atmo_material.set_shader_parameter("cloud_map_density",      cloud_map_density)
-	_atmo_material.set_shader_parameter("cloud_color",            cloud_color)
-	_atmo_material.set_shader_parameter("cloud_shadow_color",      cloud_shadow_color)
-	_atmo_material.set_shader_parameter("noise_base_scale",       noise_base_scale)
-	_atmo_material.set_shader_parameter("noise_base_strength",    noise_base_strength)
-	_atmo_material.set_shader_parameter("noise_detail_scale",     noise_detail_scale)
-	_atmo_material.set_shader_parameter("noise_detail_strength",  noise_detail_strength)
+	_atmo_material.set_shader_parameter("cloud_map_height", cloud_map_height)
+	_atmo_material.set_shader_parameter("cloud_map_density", cloud_map_density)
+	_atmo_material.set_shader_parameter("cloud_color", cloud_color)
+	_atmo_material.set_shader_parameter("cloud_shadow_color", cloud_shadow_color)
+	_atmo_material.set_shader_parameter("cloud_edge_noise", cloud_edge_noise)
+	_atmo_material.set_shader_parameter("cloud_noise_amount", cloud_noise_amount)
+	_atmo_material.set_shader_parameter("godray_intensity", godray_intensity)
+	_atmo_material.set_shader_parameter("cloud_self_shadow_intensity", cloud_self_shadow_intensity)
+	_atmo_material.set_shader_parameter("cloud_terminator_depth", cloud_terminator_depth)
+	_atmo_material.set_shader_parameter("cloud_terminator_softness", cloud_terminator_softness)
+	_atmo_material.set_shader_parameter("cloud_sunset_tint", cloud_sunset_tint)
+	_atmo_material.set_shader_parameter("cloud_terminator_offset", cloud_terminator_offset)
+	_atmo_material.set_shader_parameter("cloud_opacity", cloud_opacity)
+	_atmo_material.set_shader_parameter("cloud_dither", cloud_dither)
+	_atmo_material.set_shader_parameter("cloud_shadow_intensity", cloud_shadow_intensity)
+	_atmo_material.set_shader_parameter("noise_base_scale", noise_base_scale)
+	_atmo_material.set_shader_parameter("noise_base_strength", noise_base_strength)
+	_atmo_material.set_shader_parameter("noise_detail_scale", noise_detail_scale)
+	_atmo_material.set_shader_parameter("noise_detail_strength", noise_detail_strength)
+
+	_atmo_material.set_shader_parameter("noise_l1_enabled", noise_l1_enabled)
+	_atmo_material.set_shader_parameter("noise_l1_scale", noise_l1_scale)
+	_atmo_material.set_shader_parameter("noise_l1_strength", noise_l1_strength)
+	_atmo_material.set_shader_parameter("noise_l1_edge_only", noise_l1_edge_only)
+	_atmo_material.set_shader_parameter("noise_l1_channel", noise_l1_channel)
+
+	_atmo_material.set_shader_parameter("noise_l2_enabled", noise_l2_enabled)
+	_atmo_material.set_shader_parameter("noise_l2_scale", noise_l2_scale)
+	_atmo_material.set_shader_parameter("noise_l2_strength", noise_l2_strength)
+	_atmo_material.set_shader_parameter("noise_l2_edge_only", noise_l2_edge_only)
+	_atmo_material.set_shader_parameter("noise_l2_channel", noise_l2_channel)
+
+	_atmo_material.set_shader_parameter("noise_l3_enabled", noise_l3_enabled)
+	_atmo_material.set_shader_parameter("noise_l3_scale", noise_l3_scale)
+	_atmo_material.set_shader_parameter("noise_l3_strength", noise_l3_strength)
+	_atmo_material.set_shader_parameter("noise_l3_edge_only", noise_l3_edge_only)
+	_atmo_material.set_shader_parameter("noise_l3_channel", noise_l3_channel)
+
+	_atmo_material.set_shader_parameter("noise_l4_enabled", noise_l4_enabled)
+	_atmo_material.set_shader_parameter("noise_l4_scale", noise_l4_scale)
+	_atmo_material.set_shader_parameter("noise_l4_strength", noise_l4_strength)
+	_atmo_material.set_shader_parameter("noise_l4_edge_only", noise_l4_edge_only)
+	_atmo_material.set_shader_parameter("noise_l4_channel", noise_l4_channel)
+
+	_atmo_material.set_shader_parameter("noise_l5_enabled", noise_l5_enabled)
+	_atmo_material.set_shader_parameter("noise_l5_scale", noise_l5_scale)
+	_atmo_material.set_shader_parameter("noise_l5_strength", noise_l5_strength)
+	_atmo_material.set_shader_parameter("noise_l5_edge_only", noise_l5_edge_only)
+	_atmo_material.set_shader_parameter("noise_l5_channel", noise_l5_channel)
+
+	_atmo_material.set_shader_parameter("noise_l6_enabled", noise_l6_enabled)
+	_atmo_material.set_shader_parameter("noise_l6_scale", noise_l6_scale)
+	_atmo_material.set_shader_parameter("noise_l6_strength", noise_l6_strength)
+	_atmo_material.set_shader_parameter("noise_l6_edge_only", noise_l6_edge_only)
+	_atmo_material.set_shader_parameter("noise_l6_channel", noise_l6_channel)
+
+	_atmo_material.set_shader_parameter("noise_l7_enabled", noise_l7_enabled)
+	_atmo_material.set_shader_parameter("noise_l7_scale", noise_l7_scale)
+	_atmo_material.set_shader_parameter("noise_l7_strength", noise_l7_strength)
+	_atmo_material.set_shader_parameter("noise_l7_edge_only", noise_l7_edge_only)
+	_atmo_material.set_shader_parameter("noise_l7_channel", noise_l7_channel)
+
+	_atmo_material.set_shader_parameter("noise_l8_enabled", noise_l8_enabled)
+	_atmo_material.set_shader_parameter("noise_l8_scale", noise_l8_scale)
+	_atmo_material.set_shader_parameter("noise_l8_strength", noise_l8_strength)
+	_atmo_material.set_shader_parameter("noise_l8_edge_only", noise_l8_edge_only)
+	_atmo_material.set_shader_parameter("noise_l8_channel", noise_l8_channel)
+
+
+	var n3d := _get_or_create_3d_noise_texture()
+	if n3d:
+		_atmo_material.set_shader_parameter("noise_texture_3d", n3d)
+	var lut := _get_transmittance_lut()
+	if lut:
+		_atmo_material.set_shader_parameter("transmittance_lut", lut)
+	_atmo_material.set_shader_parameter("cloud_samples", cloud_samples)
 
 	if cloud_texture:
 		_atmo_material.set_shader_parameter("cloud_texture", cloud_texture)
@@ -1084,6 +1836,30 @@ func _set_atmo_scale(v: float) -> void:
 		if s:
 			s.radius = radius * v
 			s.height = radius * v * 2.0
+	_update_atmosphere_params()
+
+func _set_godray_intensity(v: float) -> void:
+	godray_intensity = clampf(v, 0.0, 3.0)
+	_update_atmosphere_params()
+
+func _set_rayleigh_coeff(v: Vector3) -> void:
+	rayleigh_coeff = v
+	_update_atmosphere_params()
+
+func _set_scale_height_rayleigh(v: float) -> void:
+	scale_height_rayleigh = v
+	_update_atmosphere_params()
+
+func _set_mie_coeff(v: float) -> void:
+	mie_coeff = v
+	_update_atmosphere_params()
+
+func _set_mie_g(v: float) -> void:
+	mie_g = v
+	_update_atmosphere_params()
+
+func _set_scale_height_mie(v: float) -> void:
+	scale_height_mie = v
 	_update_atmosphere_params()
 
 # Eye Adaptation & Skybox Methods
@@ -1123,6 +1899,9 @@ func _update_camera_attributes() -> void:
 		_camera_attributes.auto_exposure_max_sensitivity = 640.0
 
 func _update_eye_adaptation(delta: float, active_cam: Camera3D) -> void:
+	if not is_inside_tree() or not active_cam or not active_cam.is_inside_tree():
+		return
+
 	if not _world_env or not _sky_material or not is_instance_valid(_sky_material):
 		_setup_environment_and_adaptation()
 		if not _sky_material:
@@ -1146,13 +1925,11 @@ func _update_eye_adaptation(delta: float, active_cam: Camera3D) -> void:
 	if sun_light and sun_light.is_inside_tree():
 		sun_dir = -sun_light.global_transform.basis.z.normalized()
 
-	# 1. Direct Sun Glare:
 	var sun_alignment: float = cam_fwd.dot(sun_dir)
 	var sun_glare: float = 0.0
 	if sun_alignment > 0.0:
 		sun_glare = pow(sun_alignment, 3.0) * clampf(sun_intensity / 2.0, 0.5, 3.0)
 
-	# 2. Planet Daytime Albedo Reflection:
 	var to_planet: Vector3 = global_position - cam_pos
 	var dist_to_planet: float = to_planet.length()
 	var planet_dir: Vector3 = to_planet / maxf(dist_to_planet, 0.001)
@@ -1171,17 +1948,14 @@ func _update_eye_adaptation(delta: float, active_cam: Camera3D) -> void:
 
 	var planet_day_glare: float = day_fraction * planet_fov_coverage
 
-	# 3. Target Perceived Field-of-View Luminance:
 	var target_brightness: float = clampf(sun_glare * 0.9 + planet_day_glare * 0.9, 0.0, 1.0)
 
-	# 4. Smooth Temporal Eye Adaptation (simulating pupil dilation / contraction lag):
 	var adapt_speed: float = eye_adaptation_speed
 	if target_brightness > current_perceived_brightness:
 		adapt_speed *= 1.4
 	var t: float = 1.0 - exp(-adapt_speed * delta)
 	current_perceived_brightness = lerpf(current_perceived_brightness, target_brightness, t)
 
-	# 5. Dynamic Skybox Dimming:
 	current_skybox_energy = lerpf(skybox_max_energy, skybox_min_energy, current_perceived_brightness)
 	_sky_material.energy_multiplier = current_skybox_energy
 
@@ -1203,3 +1977,180 @@ func _set_skybox_min_energy(v: float) -> void:
 func _set_auto_exposure_scale(v: float) -> void:
 	auto_exposure_scale = v
 	_update_camera_attributes()
+
+# ==============================================================================
+# Persistent Cloud Settings System
+# ==============================================================================
+func get_cloud_settings_dict() -> Dictionary:
+	return {
+		"planet_spin_enabled": planet_spin_enabled,
+		"planet_spin_speed": planet_spin_speed,
+		"cloud_enabled": cloud_enabled,
+		"invert_clouds": invert_clouds,
+		"cloud_altitude": cloud_altitude,
+		"cloud_thickness": cloud_thickness,
+		"cloud_density": cloud_density,
+		"cloud_opacity": cloud_opacity,
+		"cloud_dither": cloud_dither,
+		"cloud_coverage": cloud_coverage,
+		"cloud_speed": cloud_speed,
+		"cloud_noise_speed": cloud_noise_speed,
+		"cloud_noise_follow": cloud_noise_follow,
+		"cloud_day_brightness": cloud_day_brightness,
+		"cloud_night_brightness": cloud_night_brightness,
+		"cloud_map_height": cloud_map_height,
+		"cloud_map_density": cloud_map_density,
+		"cloud_edge_noise": cloud_edge_noise,
+		"cloud_noise_amount": cloud_noise_amount,
+		"godray_intensity": godray_intensity,
+		"cloud_self_shadow_intensity": cloud_self_shadow_intensity,
+		"cloud_terminator_depth": cloud_terminator_depth,
+		"cloud_terminator_softness": cloud_terminator_softness,
+		"cloud_sunset_tint": cloud_sunset_tint,
+		"cloud_terminator_offset": cloud_terminator_offset,
+		"cloud_shadow_intensity": cloud_shadow_intensity,
+		"cloud_samples": cloud_samples,
+		"noise_base_scale": noise_base_scale,
+		"noise_base_strength": noise_base_strength,
+		"noise_detail_scale": noise_detail_scale,
+		"noise_detail_strength": noise_detail_strength,
+		"noise_l1_enabled": noise_l1_enabled,
+		"noise_l1_scale": noise_l1_scale,
+		"noise_l1_strength": noise_l1_strength,
+		"noise_l1_edge_only": noise_l1_edge_only,
+		"noise_l1_channel": noise_l1_channel,
+		"noise_l2_enabled": noise_l2_enabled,
+		"noise_l2_scale": noise_l2_scale,
+		"noise_l2_strength": noise_l2_strength,
+		"noise_l2_edge_only": noise_l2_edge_only,
+		"noise_l2_channel": noise_l2_channel,
+		"noise_l3_enabled": noise_l3_enabled,
+		"noise_l3_scale": noise_l3_scale,
+		"noise_l3_strength": noise_l3_strength,
+		"noise_l3_edge_only": noise_l3_edge_only,
+		"noise_l3_channel": noise_l3_channel,
+		"noise_l4_enabled": noise_l4_enabled,
+		"noise_l4_scale": noise_l4_scale,
+		"noise_l4_strength": noise_l4_strength,
+		"noise_l4_edge_only": noise_l4_edge_only,
+		"noise_l4_channel": noise_l4_channel,
+		"noise_l5_enabled": noise_l5_enabled,
+		"noise_l5_scale": noise_l5_scale,
+		"noise_l5_strength": noise_l5_strength,
+		"noise_l5_edge_only": noise_l5_edge_only,
+		"noise_l5_channel": noise_l5_channel,
+		"noise_l6_enabled": noise_l6_enabled,
+		"noise_l6_scale": noise_l6_scale,
+		"noise_l6_strength": noise_l6_strength,
+		"noise_l6_edge_only": noise_l6_edge_only,
+		"noise_l6_channel": noise_l6_channel,
+		"noise_l7_enabled": noise_l7_enabled,
+		"noise_l7_scale": noise_l7_scale,
+		"noise_l7_strength": noise_l7_strength,
+		"noise_l7_edge_only": noise_l7_edge_only,
+		"noise_l7_channel": noise_l7_channel,
+		"noise_l8_enabled": noise_l8_enabled,
+		"noise_l8_scale": noise_l8_scale,
+		"noise_l8_strength": noise_l8_strength,
+		"noise_l8_edge_only": noise_l8_edge_only,
+		"noise_l8_channel": noise_l8_channel,
+	}
+
+
+func load_cloud_settings_from_config() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load("res://cloud_settings.cfg") == OK:
+		var keys := cfg.get_section_keys("clouds")
+		for k in keys:
+			var val = cfg.get_value("clouds", k)
+			set(k, val)
+		_update_cloud_params()
+
+func save_cloud_settings_to_scene() -> bool:
+	var dict := get_cloud_settings_dict()
+
+	var cfg := ConfigFile.new()
+	for k in dict:
+		cfg.set_value("clouds", k, dict[k])
+	var err := cfg.save("res://cloud_settings.cfg")
+	if err != OK:
+		push_warning("Failed to save cloud_settings.cfg: %s" % err)
+
+	var tscn_path := "res://scenes/space.tscn"
+	if not FileAccess.file_exists(tscn_path):
+		return true
+
+	var f_read := FileAccess.open(tscn_path, FileAccess.READ)
+	if not f_read:
+		return false
+	var content := f_read.get_as_text()
+	f_read.close()
+
+	var planet_tag := '[node name="Planet" '
+	var start_idx := content.find(planet_tag)
+	if start_idx == -1:
+		return true
+
+	var next_node_idx := content.find("\n[node ", start_idx + 1)
+	var end_idx := content.length() if next_node_idx == -1 else next_node_idx
+
+	var planet_block := content.substr(start_idx, end_idx - start_idx)
+	var lines := planet_block.split("\n")
+	var new_lines: Array[String] = []
+
+	var handled_keys: Dictionary = {}
+	for line in lines:
+		var trimmed := line.strip_edges()
+		var eq_pos := trimmed.find(" = ")
+		if eq_pos > 0 and not trimmed.begins_with("["):
+			var key := trimmed.substr(0, eq_pos).strip_edges()
+			if dict.has(key):
+				var val = dict[key]
+				var val_str := ""
+				if typeof(val) == TYPE_BOOL:
+					val_str = "true" if val else "false"
+				elif typeof(val) == TYPE_FLOAT:
+					val_str = "%.4f" % val if val != floor(val) else "%.1f" % val
+				else:
+					val_str = str(val)
+				new_lines.append("%s = %s" % [key, val_str])
+				handled_keys[key] = true
+				continue
+		new_lines.append(line)
+
+	var insert_pos := -1
+	for i in range(new_lines.size()):
+		if new_lines[i].begins_with("face_a_color"):
+			insert_pos = i
+			break
+	if insert_pos == -1:
+		insert_pos = new_lines.size()
+
+	var to_insert: Array[String] = []
+	for k in dict:
+		if not handled_keys.has(k):
+			var val = dict[k]
+			var val_str := ""
+			if typeof(val) == TYPE_BOOL:
+				val_str = "true" if val else "false"
+			elif typeof(val) == TYPE_FLOAT:
+				val_str = "%.4f" % val if val != floor(val) else "%.1f" % val
+			else:
+				val_str = str(val)
+			to_insert.append("%s = %s" % [k, val_str])
+
+	for l in to_insert:
+		new_lines.insert(insert_pos, l)
+		insert_pos += 1
+
+	var new_planet_block := "\n".join(new_lines)
+	var new_content := content.substr(0, start_idx) + new_planet_block + content.substr(end_idx)
+
+	var f_write := FileAccess.open(tscn_path, FileAccess.WRITE)
+	if f_write:
+		f_write.store_string(new_content)
+		f_write.close()
+		print("[Planet] Cloud settings successfully saved and applied to scenes/space.tscn and cloud_settings.cfg!")
+		return true
+
+	return false

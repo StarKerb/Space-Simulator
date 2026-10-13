@@ -1,0 +1,99 @@
+# TASK: Fix Severe Horizon Cloud Raymarching Glitch & Noise Wall in Godot 4
+
+## Problem Description & Screenshot Analysis
+In the current implementation of `shaders/atmosphere.gdshader`:
+When the camera is on or near the ground and looks towards the horizon:
+1. **Static / Noise Wall at Horizon**: Right above the planet horizon, the clouds turn into a dense, dark, static-filled "wall" with severe noise and stippling artifacts.
+2. **Massive Spherical Silhouette / Cutoff Dome**: On the sides and above the horizon, there is an unnatural curved boundary / dome cutting into the sky.
+3. **Extreme Optical Depth Blowup**: Cloud density accumulates into pitch-black/grey opacity right at grazing angles, completely destroying the vista.
+
+---
+
+## Root Causes in `atmosphere.gdshader`
+
+### 1. Missing Maximum Cloud Distance (`t_end` spans hundreds of kilometers)
+- In `fragment()`:
+  ```glsl
+  vec2 atmo_hit = ray_sphere(cam_pos, ray_dir, planet_center, atmo_radius);
+  float t_start = max(0.0, atmo_hit.x);
+  float t_end = atmo_hit.y;
+  ```
+- When looking 1 pixel above the ground, the ray misses the planet sphere (`planet_hit.x <= 0`). Consequently, `t_end = atmo_hit.y`, which is the exit point on the **far opposite side of the planet** (~350–450 units / kilometers away).
+- The raymarched loop marches all the way through the planet's atmosphere to the opposite side of the globe! It samples clouds on the near side, then samples clouds **again on the opposite side of the planet**, creating the giant curved dome/silhouette artifact visible in the sky.
+
+### 2. Excessive Step Size (`dt`) Causing Massive Dither Explosion
+- Step size is computed as `dt = march_dist * ... / total_steps`.
+- When `march_dist` jumps from ~5 units (looking at ground) to ~420 units (skimming the horizon), `dt` explodes from 0.1 to 15.0+ units!
+- Because `t = t0 + dt * dither_val`, jittering by `dt * dither_val` shifts sample positions by up to 15 kilometers between neighboring pixels. This produces the intense, stippled "TV static" noise seen across the horizon.
+
+### 3. Horizon Tangent Path Length Explosion
+- When looking up at zenith, the cloud traversal length is simply `cloud_thickness` (~3.7 units).
+- At grazing horizon angles, the chord through a spherical shell scales with $\sqrt{2 R h} \approx 60 - 150$ units (over 30× longer).
+- Without horizon distance clamping and aerial perspective extinction, optical depth becomes absurdly large ($100\%$ opaque black wall), completely blocking twilight and sunset light.
+
+---
+
+## Instructions & Required Fixes for `shaders/atmosphere.gdshader`
+
+### Fix 1: Clamp Cloud Raymarch Distance to Maximum Horizon Visibility
+- Do **NOT** march clouds across the entire diameter of the planet!
+- Introduce a uniform or constant `max_cloud_distance` calibrated to realistic curvature visibility:
+  ```glsl
+  uniform float max_cloud_distance = 65.0; // In engine units (~65 km visibility limit)
+  ```
+- For rays that pass above the planet horizon, clamp the cloud march end distance:
+  ```glsl
+  float t_cloud_end = min(t_end, t_start + max_cloud_distance);
+  ```
+- Any ray segment beyond `t_cloud_end` should only evaluate clear atmosphere scattering, NEVER cloud density from the opposite side of the planet.
+
+### Fix 2: Analytical Cloud Shell Intersection Interval
+- Instead of marching one uniform pass across the whole atmosphere, calculate the exact entry and exit distances for the cloud shell:
+  ```glsl
+  float r_c_bot = planet_radius + cloud_altitude;
+  float r_c_top = r_c_bot + cloud_thickness;
+  vec2 hit_c_top = ray_sphere(cam_pos, ray_dir, planet_center, r_c_top);
+  vec2 hit_c_bot = ray_sphere(cam_pos, ray_dir, planet_center, r_c_bot);
+  ```
+- Determine the valid near-field cloud segment `[t_cloud_start, t_cloud_end]`:
+  - If camera is below clouds: entry is `hit_c_bot.y` (or `hit_c_bot.x`), exit is `hit_c_top.y`.
+  - If camera is inside clouds: entry is `0.0`, exit is `min(hit_c_bot.x, hit_c_top.y)`.
+  - If camera is in space: entry is `hit_c_top.x`, exit is `min(hit_c_bot.x, hit_c_top.y)`.
+- If the ray points below the horizon or exits into the planet surface, cap `t_cloud_end` at the terrain/planet surface distance.
+- Strictly ignore the secondary intersection on the far side of the planet (`hit.y` when `hit.x` was in front of the planet).
+
+### Fix 3: Step Size Clamping & Near-Field Step Budget
+- Cap the maximum step size `dt`:
+  ```glsl
+  float max_dt = cloud_thickness * 0.5; // E.g., ~1.5 - 2.0 units max
+  ```
+- When rays travel along oblique paths near the horizon, do not let `dt` grow arbitrarily large.
+- Restrict dither jitter amplitude to sub-step scale:
+  ```glsl
+  float dither_offset = (dither_val - 0.5) * min(dt, max_dt);
+  ```
+  This eliminates the extreme speckled noise wall at the horizon while preserving smooth banding-free transitions.
+
+### Fix 4: Horizon Aerial Perspective Fade
+- Clouds approaching `max_cloud_distance` should smoothly blend into the atmospheric Rayleigh/Mie haze rather than abruptly ending or forming a sharp dark cut:
+  ```glsl
+  float dist_to_sample = distance(cam_pos, p);
+  float horizon_fade = clamp(1.0 - (dist_to_sample - (max_cloud_distance * 0.6)) / (max_cloud_distance * 0.4), 0.0, 1.0);
+  dens *= smoothstep(0.0, 1.0, horizon_fade);
+  ```
+- This ensures distant clouds naturally dissolve into the sky haze near the horizon just like in real life.
+
+### Fix 5: Terminator & Ground Shadow Occlusion Check
+- For rays grazing the horizon, ensure the planet body occludes sunlight on clouds that dip into the planet's geometric shadow.
+- In `sample_cloud_density_at` and `calc_atmo_sample_full`, verify that `sun_dot` smoothly transitions into twilight without negative shadow light bleeding.
+
+---
+
+## Verification Checklist
+1. Stand on the planet surface and look directly at the horizon and sunset:
+   - Clouds at the horizon should appear soft, naturally hazy, and tinted by sunset colors.
+   - The solid dark "wall of static noise" must be completely gone.
+   - No curved sphere boundary or dark silhouette should cut across the sky.
+2. Fly the camera upwards from surface to orbit:
+   - Transition between surface view, flying inside the cloud deck, and space view must remain smooth without popping or clipping artifacts.
+3. Framerate must remain stable (or improve) because samples are no longer wasted marching hundreds of units through the far hemisphere.

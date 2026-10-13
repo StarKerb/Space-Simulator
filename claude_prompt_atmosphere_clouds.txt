@@ -1,0 +1,102 @@
+# TASK: Revamp Atmosphere & Volumetric Cloud Visuals in Godot 4 Space Simulator
+
+## Codebase Context
+- Engine: Godot 4.x (Vulkan Forward+ / Mobile renderer, Godot Shading Language .gdshader)
+- Key Files:
+  - shaders/atmosphere.gdshader (Unified atmosphere raymarching + volumetric clouds)
+  - scripts/planet.gd (Uniform upload, LUT loading, atmosphere shell management)
+  - scripts/planet_debug_ui.gd (ImGui / runtime debug parameter controls)
+  - shaders/ocean.gdshader (Ocean shading & cloud shadow projection)
+  - shaders/clouds.gdshader (Standalone cloud shader reference)
+- Geometry & Scale:
+  - Planet radius planet_radius ≈ 600.0
+  - Atmosphere shell atmo_radius ≈ 636.0 (thickness ≈ 36.0)
+  - Cloud altitude cloud_altitude ≈ 2.0 - 6.0, thickness cloud_thickness ≈ 3.5 - 5.0
+  - Inverted shell (SphereMesh, cull_front, unshaded, render_priority = 10)
+
+---
+
+## 1. Critical Bugs to Fix
+
+### A. Hardcoded Scattering Coefficients Overriding Uniforms
+- Bug: In shaders/atmosphere.gdshader (around line 447), beta_r and beta_m are hardcoded:
+  ```glsl
+  vec3 beta_r = vec3(0.0035, 0.0085, 0.021);
+  float beta_m = 0.002;
+  ```
+  This completely ignores and overrides the exported uniforms rayleigh_coeff and mie_coeff passed from planet.gd.
+- Fix: Wire rayleigh_coeff and mie_coeff directly into the scattering calculations, ensuring inspector and UI adjustments take immediate effect.
+
+### B. Severe Cloud Undersampling Due to Full-Atmosphere Raymarch
+- Bug: The raymarch marches linearly/power-law across the entire atmosphere span t_start to t_end (which spans 40–200+ units from space), while clouds only exist within a narrow band of ~3.5 units (r_c_bot to r_c_top). With only 16–48 steps, 0 to 2 steps hit the cloud volume, resulting in severe slicing, stepping noise, missing cloud banks, or paper-thin appearance at glancing angles.
+- Fix: Implement dedicated segment intersection for the cloud deck:
+  - Compute analytical ray-sphere intersections for both the atmosphere shell [t_atmo_start, t_atmo_end] AND the cloud shell [t_cloud_start, t_cloud_end] (r_c_bot to r_c_top).
+  - March the cloud layer within its dedicated interval using uniform or jittered steps calibrated to cloud thickness, while computing atmosphere in-scattering efficiently without wasting cloud samples on empty space.
+
+### C. Color Extinction & Alpha Blending Washout
+- Bug: In atmosphere.gdshader, lines 630–638 calculate:
+  ```glsl
+  float avg_trans = clamp((atmo_transmittance.r + atmo_transmittance.g + atmo_transmittance.b) / 3.0, 0.0, 1.0);
+  float final_alpha = clamp(1.0 - avg_trans, 0.0, 1.0);
+  ALBEDO = total_color / max(final_alpha, 0.001);
+  ALPHA = final_alpha;
+  ```
+  Rayleigh scattering attenuates blue wavelengths much faster than red. Averaging atmo_transmittance into a scalar alpha destroys chromatic extinction on the underlying terrain and ocean. At sunset, terrain and oceans appear desaturated/grey rather than warm and tinted by twilight atmosphere.
+- Fix: Correct the alpha blending model. Use premultiplied alpha (render_mode blend_premul_alpha) or additive/modulative integration so that ALBEDO = total_color and background extinction correctly preserves wavelength-dependent scattering.
+
+### D. Pole Pinching / Singularity Artifacts
+- Bug: UV mapping in sample_cloud_density_at uses spherical equirectangular coordinates:
+  ```glsl
+  float lat = asin(clamp(norm_c.y, -1.0, 1.0));
+  float v_uv = 0.5 - lat / 3.141592653589793;
+  ```
+  This creates visible pinching and distortion spirals at the North and South poles.
+- Fix: Apply polar blending (smoothly transition to triplanar or polar-corrected mapping near |y| > 0.85) or use seamless spherical mapping.
+
+### E. Self-Shadowing Stepping & Noise Banding
+- Bug: In-cloud light march uses two fixed relative probe positions (0.25 and 0.70), creating harsh step banding and pitch-black cloud undersides instead of realistic volumetric soft shadowing.
+- Fix: Implement a 4-tap or 6-tap progressive shadow ray with exponential step spacing towards the sun, incorporating multiple scattering and the Beer-Powder effect.
+
+---
+
+## 2. Visual & Quality Enhancements
+
+### A. Dual Henyey-Greenstein Cloud Phase Function
+Replace the empirical polynomial phase function with a realistic dual-lobe Henyey-Greenstein phase function:
+  P(theta) = k * HG(theta, g_forward) + (1 - k) * HG(theta, g_backward)
+- Forward lobe (g1 ≈ 0.75 - 0.82) produces dramatic silver linings around the sun.
+- Backward lobe (g2 ≈ -0.15 - -0.25) generates the glory / heiligenschein opposite the sun.
+- Parameterize lobe blend (k ≈ 0.7 - 0.8).
+
+### B. Multiple Scattering & Beer-Powder Law
+Enhance cloud lighting with the Wrenninge / Ebert multiple scattering approximation:
+- Compute primary extinction via Beer-Lambert law: T1 = exp(-d * sigma_t).
+- Compute secondary scattering octave: T2 = A * exp(-d * sigma_t * B) (e.g. A ≈ 0.5, B ≈ 0.25).
+- Combine with the Powder Effect: 1.0 - exp(-2.0 * d * dt) for forward-facing fluffiness that prevents dark silhouettes on illuminated edges.
+
+### C. Atmospheric Sunset & Ozone Chappuis Absorption
+- Integrate an Ozone (Chappuis) absorption layer (h ≈ 15 - 30 km) with coefficient beta_o ≈ (0.65, 1.88, 0.085) * 1e-6. This prevents the horizon from turning unnaturally yellow-green during sunset and produces realistic twilight blues.
+- Ensure smooth sunset transition across the day/night terminator without sharp dark cutoff lines.
+
+### D. Cloud Density Shaping & 3D Noise Optimization
+- Optimize the 8-layer 3D noise evaluation in sample_cloud_density_at:
+  - Early-out immediately when macro envelope / coverage is 0.
+  - Evaluate coarse low-frequency shapes first (Layers 1–2).
+  - Condition micro-detail evaluation (Layers 3+) on distance from camera and distance to cloud surface, avoiding expensive 3D texture samples inside solid cloud cores or at long distances.
+- Retain billow and cauliflower sculpting while eliminating graininess via 3D blue-noise or spatial dither with camera-tracking temporal jitter.
+
+### E. Dynamic Ocean & Terrain Cloud Shadows
+- Synchronize cloud shadow calculation in shaders/ocean.gdshader so that the shadow projection accounts for cloud altitude and sun angle identically to the volumetric cloud raymarch.
+
+---
+
+## 3. Implementation Requirements
+1. Preserve Godot Compatibility:
+   - Maintain compatibility with Godot 4.x Spatial Shader uniforms and built-ins (INV_VIEW_MATRIX, INV_PROJECTION_MATRIX, SCREEN_UV, etc.).
+   - Keep parameter names backwards-compatible with planet.gd and planet_debug_ui.gd so existing scenes and saved configs continue to load.
+2. Performance Constraints:
+   - Keep default step count scalable (cloud_samples 16 to 48).
+   - Ensure the shader runs smoothly on mid-tier GPUs at 60+ FPS.
+3. Clean Code Structure:
+   - Organize atmosphere.gdshader with clean helper functions: phase evaluation, density sampling, shadow integration, and atmosphere scattering.
+   - Add concise comments explaining the physical units, math formulas, and remap curves.
