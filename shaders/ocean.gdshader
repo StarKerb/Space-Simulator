@@ -303,7 +303,7 @@ void fragment() {
 	vec4 base_water = mix(shallow_color, deep_color, absorption);
 
 	// Accurate camera distances
-	vec3 cam_pos_world = (length(camera_pos) > 0.001) ? camera_pos : CAMERA_POSITION_WORLD;
+	vec3 cam_pos_world = CAMERA_POSITION_WORLD;
 	float cam_dist = length(v_world_pos - cam_pos_world);
 	float cam_alt = max(0.0, length(cam_pos_world - planet_center) - (planet_radius + ocean_altitude));
 
@@ -370,7 +370,7 @@ void fragment() {
 					float sin_nr = sin(rot_noise_angle);
 					vec3 v_c_local = p_cloud - planet_center;
 					vec3 v_c_rot = vec3(v_c_local.x * cos_nr + v_c_local.z * sin_nr, v_c_local.y, -v_c_local.x * sin_nr + v_c_local.z * cos_nr);
-					const float NOISE_DOMAIN = 18000.0;
+					float noise_domain = max(18000.0, planet_radius * 30.0);
 
 					float edge_ramp_width = mix(0.22, 0.58, clamp(cloud_edge_noise * 0.5, 0.0, 1.0));
 					float edge_feather = smoothstep(0.005, edge_ramp_width, cov);
@@ -379,7 +379,7 @@ void fragment() {
 					float edge_factor = 1.0 - smoothstep(0.02, 0.65, cov);
 
 					if (noise_l1_enabled && noise_l1_strength > 0.001) {
-						float s1 = min(noise_l1_scale, 700.0) / NOISE_DOMAIN;
+						float s1 = min(noise_l1_scale, 700.0) / noise_domain;
 						vec3 uvw1 = v_c_rot * s1;
 						float n_a = get_noise_ch(textureLod(noise_texture_3d, uvw1, 0.0), noise_l1_channel);
 						float n_b = get_noise_ch(textureLod(noise_texture_3d, uvw1 + vec3(0.018, 0.0, 0.018), 0.0), noise_l1_channel);
@@ -390,7 +390,7 @@ void fragment() {
 						base_cloud = clamp((base_cloud - erode1) / max(0.05, 1.0 - erode1), 0.0, 1.0);
 					}
 					if (noise_l2_enabled && noise_l2_strength > 0.001 && base_cloud > 0.001) {
-						float s2 = min(noise_l2_scale, 900.0) / NOISE_DOMAIN;
+						float s2 = min(noise_l2_scale, 900.0) / noise_domain;
 						vec3 uvw2 = v_c_rot * s2;
 						float n2_a = get_noise_ch(textureLod(noise_texture_3d, uvw2, 0.0), noise_l2_channel);
 						float n2_b = get_noise_ch(textureLod(noise_texture_3d, uvw2 + vec3(0.022, 0.0, -0.022), 0.0), noise_l2_channel);

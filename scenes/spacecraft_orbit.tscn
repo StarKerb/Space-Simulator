@@ -1,0 +1,73 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/spacecraft_orbit_scene.gd" id="1_scene"]
+[ext_resource type="PackedScene" uid="uid://hgdfgc5qam2i" path="res://scenes/planet.tscn" id="2_planet"]
+[ext_resource type="PackedScene" path="res://scenes/spacecraft.tscn" id="3_craft"]
+[ext_resource type="Script" path="res://scripts/orbit_camera.gd" id="4_cam"]
+[ext_resource type="Script" path="res://scripts/orbit_renderer.gd" id="5_rend"]
+[ext_resource type="Script" path="res://scripts/floating_origin_manager.gd" id="6_origin"]
+[ext_resource type="Script" path="res://scripts/flight_hud.gd" id="7_hud"]
+[ext_resource type="Script" path="res://scripts/planet_debug_ui.gd" id="8_debug"]
+
+[node name="SpacecraftOrbitScene" type="Node3D" node_paths=PackedStringArray("planet", "craft", "orbit_camera", "orbit_renderer", "floating_origin", "flight_hud")]
+script = ExtResource("1_scene")
+planet = NodePath("Planet")
+craft = NodePath("Spacecraft")
+orbit_camera = NodePath("OrbitCamera")
+orbit_renderer = NodePath("OrbitRenderer")
+floating_origin = NodePath("FloatingOriginManager")
+flight_hud = NodePath("FlightHUD")
+
+[node name="PlanetDebugUI" type="Node" parent="."]
+script = ExtResource("8_debug")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 150000000)
+light_energy = 1.0
+shadow_enabled = false
+
+[node name="Planet" parent="." node_paths=PackedStringArray("sun_light") instance=ExtResource("2_planet")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -6671000)
+radius = 6371000.0
+height_scale = 8848.0
+sun_light = NodePath("../DirectionalLight3D")
+ocean_bed_sink = 4000.0
+ocean_altitude = 0.0
+atmosphere_scale = 1.0157
+rayleigh_coeff = Vector3(5.8e-06, 1.35e-05, 3.31e-05)
+scale_height_rayleigh = 0.001255
+mie_coeff = 4.0e-06
+scale_height_mie = 0.000188
+sun_intensity = 1.0
+cloud_day_brightness = 1.0
+cloud_altitude = 2500.0
+cloud_thickness = 3500.0
+cloud_density = 0.55
+cloud_samples = 28
+
+[node name="Spacecraft" parent="." instance=ExtResource("3_craft")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="OrbitCamera" type="Camera3D" parent="." node_paths=PackedStringArray("target")]
+transform = Transform3D(1, 0, 0, 0, 0.948683, 0.316228, 0, -0.316228, 0.948683, 15, 6, 15)
+near = 0.1
+far = 100000000.0
+script = ExtResource("4_cam")
+target = NodePath("../Spacecraft")
+distance = 22.0
+
+[node name="OrbitRenderer" type="Node3D" parent="."]
+script = ExtResource("5_rend")
+
+[node name="FloatingOriginManager" type="Node" parent="." node_paths=PackedStringArray("craft", "planet", "camera", "sun_light", "trajectory_renderer")]
+script = ExtResource("6_origin")
+craft = NodePath("../Spacecraft")
+planet = NodePath("../Planet")
+camera = NodePath("../OrbitCamera")
+sun_light = NodePath("../DirectionalLight3D")
+trajectory_renderer = NodePath("../OrbitRenderer")
+shift_threshold = 50000.0
+
+[node name="FlightHUD" type="CanvasLayer" parent="." node_paths=PackedStringArray("craft")]
+script = ExtResource("7_hud")
+craft = NodePath("../Spacecraft")

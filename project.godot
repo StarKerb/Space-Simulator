@@ -64,6 +64,7 @@ toggle_wireframe={
 [physics]
 
 3d/physics_engine="Jolt Physics"
+jolt_physics_3d/limits/max_linear_velocity=200000.0
 
 [rendering]
 
